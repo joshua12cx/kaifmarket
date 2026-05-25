@@ -2,68 +2,72 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Alert, Switch,
+  StyleSheet, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SPACING, RADIUS, FONT, SHADOW } from '../theme';
 import { PRODUCTS } from '../data';
-import { createOrder } from '../services';
 import { useCart } from '../context';
+import { supabase } from '../lib/supabase';
 
 export default function CartScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const { items, dispatch } = useCart();
   const [couponApplied, setCouponApplied] = useState(false);
-  const [loading, setLoading]             = useState(false);
-  const [expresss, setExpress]            = useState(false);
+  const [expresss, setExpress] = useState(false);
+  const [supabaseProds, setSupabaseProds] = useState<Record<string, any>>({});
 
+  // ── Cargar productos de Supabase si hay IDs string ────────────
+  React.useEffect(() => {
+    const stringIds = Object.keys(items).filter(id =>
+      isNaN(Number(id)) && items[id] > 0
+    );
+    if (stringIds.length === 0) { return; }
+
+    supabase
+      .from('products')
+      .select('*')
+      .in('id', stringIds)
+      .then(({ data }: { data: any[] | null }) => {
+        if (data) {
+          const map: Record<string, any> = {};
+          data.forEach((p: any) => { map[p.id] = p; });
+          setSupabaseProds(map);
+        }
+      });
+  }, [items]);
+
+  // ── Construir entries mezclando estáticos y Supabase ──────────
   const cartEntries = Object.entries(items)
     .filter(([, q]) => q > 0)
-    .map(([id, qty]) => ({ product: PRODUCTS.find(p => p.id === Number(id))!, qty }))
-    .filter(e => e.product);
+    .map(([id, qty]) => {
+      const isString = isNaN(Number(id));
+      const product = isString
+        ? supabaseProds[id]
+        : PRODUCTS.find(p => p.id === Number(id));
+      if (!product) { return null; }
+      return {
+        product: {
+          ...product,
+          // Normalizar campos
+          bgColor: product.bgColor || product.bg_color || '#F5F5F5',
+          oldPrice: product.oldPrice || product.old_price || null,
+          imageUrl: product.image_url || null,
+          emoji: product.emoji || '📦',
+          isPremiumSeller: product.isPremiumSeller || product.is_premium || false,
+        },
+        qty,
+        id,
+      };
+    })
+    .filter(Boolean) as { product: any; qty: number; id: string }[];
 
-  const subtotal   = cartEntries.reduce((s, e) => s + e.product.price * e.qty, 0);
-  const discount   = couponApplied ? Math.round(subtotal * 0.1) : 0;
-  const delivery   = expresss ? 8 : 0;
-  const total      = subtotal - discount + delivery;
+  const subtotal = cartEntries.reduce((s, e) => s + e.product.price * e.qty, 0);
+  const discount = couponApplied ? Math.round(subtotal * 0.1) : 0;
+  const delivery = expresss ? 8 : 0;
+  const total = subtotal - discount + delivery;
 
-  const handleOrder = async () => {
-    setLoading(true);
-
-    // ════════════════════════════════════════════════════
-    // TODO BACKEND — descomentar cuando el backend esté listo
-    // ════════════════════════════════════════════════════
-    // const token = await AsyncStorage.getItem('token');
-    // const res = await fetch(`${API_URL}/orders`, {
-    //   method: 'POST',
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //     'Authorization': `Bearer ${token}`,
-    //   },
-    //   body: JSON.stringify({
-    //     items: cartEntries.map(e => ({ productId: e.product.id, qty: e.qty })),
-    //     coupon: couponApplied ? 'KAIF10' : null,
-    //     delivery: expresss ? 'express' : 'standard',
-    //   }),
-    // });
-    // const data = await res.json();
-    // if (!res.ok) throw new Error(data.message);
-    // return data;
-    // ════════════════════════════════════════════════════
-
-    const result = await createOrder(cartEntries);
-    setLoading(false);
-
-    if (result.success) {
-      Alert.alert(
-        '¡Pedido confirmado! 🎉',
-        `ID: ${result.orderId}\nTotal: S/ ${total}\nLlegará ${expresss ? 'hoy (Exprés)' : 'mañana (Estándar)'}`,
-        [{ text: '¡Genial!', onPress: () => dispatch({ type: 'CLEAR' }) }],
-      );
-    }
-  };
-
-  // ── Carrito vacío ──────────────────────────────────────────────
+  // ── Carrito vacío ─────────────────────────────────────────────
   if (cartEntries.length === 0) {
     return (
       <View style={[cs.container, { paddingTop: insets.top }]}>
@@ -74,7 +78,9 @@ export default function CartScreen({ navigation }: any) {
           <Text style={cs.emptyEmoji}>🛒</Text>
           <Text style={cs.emptyTitle}>Tu carrito está vacío</Text>
           <Text style={cs.emptySub}>Agrega productos para empezar a comprar</Text>
-          <TouchableOpacity style={cs.emptyBtn} onPress={() => navigation.navigate('HomeMain')}>
+          <TouchableOpacity
+            style={cs.emptyBtn}
+            onPress={() => navigation.navigate('HomeMain')}>
             <Text style={cs.emptyBtnTxt}>Ir a la tienda</Text>
           </TouchableOpacity>
         </View>
@@ -93,25 +99,37 @@ export default function CartScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 180 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 180 }}>
 
         {/* ── ITEMS ── */}
         <View style={cs.itemsCard}>
-          {cartEntries.map(({ product, qty }, idx) => {
+          {cartEntries.map(({ product, qty, id }, idx) => {
             const disc = product.oldPrice
-              ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100) : null;
+              ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100)
+              : null;
 
             return (
-              <View key={product.id}>
+              <View key={id}>
                 <View style={cs.item}>
-                  {/* Checkbox simulado */}
-                  <View style={cs.checkbox}><Text style={{ color: COLORS.white, fontSize: 12 }}>✓</Text></View>
+                  <View style={cs.checkbox}>
+                    <Text style={{ color: COLORS.white, fontSize: 12 }}>✓</Text>
+                  </View>
 
                   {/* Imagen */}
                   <TouchableOpacity
                     style={[cs.itemImg, { backgroundColor: product.bgColor }]}
                     onPress={() => navigation.navigate('ProductDetail', { productId: product.id })}>
-                    <Text style={{ fontSize: 36 }}>{product.emoji}</Text>
+                    {product.imageUrl ? (
+                      <Image
+                        source={{ uri: product.imageUrl }}
+                        style={cs.itemImgReal}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <Text style={{ fontSize: 36 }}>{product.emoji}</Text>
+                    )}
                     {disc && (
                       <View style={cs.itemDisc}>
                         <Text style={cs.itemDiscTxt}>-{disc}%</Text>
@@ -155,7 +173,6 @@ export default function CartScreen({ navigation }: any) {
                     </View>
                   </View>
                 </View>
-
                 {idx < cartEntries.length - 1 && <View style={cs.divider} />}
               </View>
             );
@@ -173,7 +190,9 @@ export default function CartScreen({ navigation }: any) {
               <Text style={cs.deliveryLabel}>Estándar · Gratis</Text>
               <Text style={cs.deliveryDate}>Mañana, 9:00–18:00</Text>
             </View>
-            {!expresss && <Text style={{ color: COLORS.green, fontSize: 13, fontWeight: FONT.bold }}>Gratis</Text>}
+            {!expresss && (
+              <Text style={{ color: COLORS.green, fontSize: 13, fontWeight: FONT.bold }}>Gratis</Text>
+            )}
           </TouchableOpacity>
           <TouchableOpacity
             style={[cs.deliveryOpt, expresss && cs.deliveryOptActive]}
@@ -213,7 +232,9 @@ export default function CartScreen({ navigation }: any) {
         </View>
 
         {/* ── PLUS HINT ── */}
-        <TouchableOpacity style={cs.plusHint} onPress={() => navigation.navigate('Profile')}>
+        <TouchableOpacity
+          style={cs.plusHint}
+          onPress={() => navigation.navigate('Profile')}>
           <Text style={cs.plusHintIcon}>✦</Text>
           <View style={{ flex: 1 }}>
             <Text style={cs.plusHintTitle}>Con Kaif Plus ahorras S/ {Math.round(total * 0.02)} extra</Text>
@@ -243,7 +264,10 @@ export default function CartScreen({ navigation }: any) {
               <Text style={[cs.sumVal, { color: COLORS.red }]}>−S/ {discount}</Text>
             </View>
           )}
-          <View style={[cs.sumRow, { marginTop: SPACING.sm, paddingTop: SPACING.sm, borderTopWidth: 0.5, borderTopColor: COLORS.border }]}>
+          <View style={[cs.sumRow, {
+            marginTop: SPACING.sm, paddingTop: SPACING.sm,
+            borderTopWidth: 0.5, borderTopColor: COLORS.border,
+          }]}>
             <Text style={cs.totalLabel}>Total</Text>
             <Text style={cs.totalVal}>S/ {total}</Text>
           </View>
@@ -258,13 +282,10 @@ export default function CartScreen({ navigation }: any) {
           <Text style={cs.bottomTotal}>S/ {total}</Text>
         </View>
         <TouchableOpacity
-          style={[cs.confirmBtn, loading && { opacity: 0.7 }]}
-          onPress={handleOrder}
-          disabled={loading}
+          style={cs.confirmBtn}
+          onPress={() => navigation.navigate('Checkout')}
           activeOpacity={0.85}>
-          <Text style={cs.confirmBtnTxt}>
-            {loading ? 'Procesando...' : 'Confirmar pedido →'}
-          </Text>
+          <Text style={cs.confirmBtnTxt}>Finalizar compra →</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -272,61 +293,62 @@ export default function CartScreen({ navigation }: any) {
 }
 
 const cs = StyleSheet.create({
-  container:        { flex: 1, backgroundColor: COLORS.gray50 },
-  header:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14, backgroundColor: COLORS.white, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
-  headerTitle:      { fontSize: 20, fontWeight: FONT.black, color: COLORS.gray800 },
-  clearTxt:         { fontSize: 14, color: COLORS.red, fontWeight: FONT.bold },
-  empty:            { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-  emptyEmoji:       { fontSize: 64, marginBottom: 16 },
-  emptyTitle:       { fontSize: 18, fontWeight: FONT.black, color: COLORS.gray800, marginBottom: 8 },
-  emptySub:         { fontSize: 14, color: COLORS.gray400, textAlign: 'center', marginBottom: 24 },
-  emptyBtn:         { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingHorizontal: 32, paddingVertical: 14 },
-  emptyBtnTxt:      { color: '#fff', fontWeight: FONT.black, fontSize: 15 },
-  itemsCard:        { backgroundColor: COLORS.white, marginBottom: SPACING.sm },
-  item:             { flexDirection: 'row', gap: 12, padding: SPACING.lg, alignItems: 'flex-start' },
-  checkbox:         { width: 22, height: 22, borderRadius: 11, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center', marginTop: 4, flexShrink: 0 },
-  itemImg:          { width: 80, height: 80, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', position: 'relative', flexShrink: 0 },
-  itemDisc:         { position: 'absolute', top: 4, left: 4, backgroundColor: COLORS.red, borderRadius: RADIUS.sm, paddingHorizontal: 4, paddingVertical: 2 },
-  itemDiscTxt:      { color: '#fff', fontSize: 9, fontWeight: FONT.black },
-  itemInfo:         { flex: 1 },
-  itemName:         { fontSize: 13, fontWeight: FONT.semibold, color: COLORS.gray800, lineHeight: 18, marginBottom: 4 },
-  premBadge:        { alignSelf: 'flex-start', backgroundColor: COLORS.primaryLight, borderRadius: RADIUS.sm, paddingHorizontal: 6, paddingVertical: 2, marginBottom: 6 },
-  premBadgeTxt:     { fontSize: 10, color: COLORS.primary, fontWeight: FONT.bold },
-  itemPriceRow:     { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 8 },
-  itemPrice:        { fontSize: 16, fontWeight: FONT.black, color: COLORS.gray800 },
-  itemOldPrice:     { fontSize: 12, color: COLORS.gray400, textDecorationLine: 'line-through' },
-  qtyRow:           { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  qtyBtn:           { width: 32, height: 32, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.white },
-  qtyBtnTxt:        { fontSize: 18, fontWeight: FONT.bold, color: COLORS.gray800, lineHeight: 22 },
-  qtyNum:           { fontSize: 15, fontWeight: FONT.black, color: COLORS.gray800, minWidth: 28, textAlign: 'center' },
-  deleteBtn:        { marginLeft: 8, padding: 4 },
-  divider:          { height: 0.5, backgroundColor: COLORS.border, marginHorizontal: SPACING.lg },
-  card:             { backgroundColor: COLORS.white, marginBottom: SPACING.sm, padding: SPACING.lg },
-  cardTitle:        { fontSize: 16, fontWeight: FONT.black, color: COLORS.gray800, marginBottom: 12 },
-  deliveryOpt:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border, marginBottom: 8 },
-  deliveryOptActive:{ borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight },
-  radio:            { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: COLORS.border },
-  radioActive:      { borderColor: COLORS.primary, backgroundColor: COLORS.primary },
-  deliveryLabel:    { fontSize: 14, fontWeight: FONT.bold, color: COLORS.gray800 },
-  deliveryDate:     { fontSize: 12, color: COLORS.gray400, marginTop: 2 },
-  addressRow:       { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
-  addressTxt:       { flex: 1, fontSize: 13, color: COLORS.primary, fontWeight: FONT.semibold },
-  couponRow:        { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border },
-  couponRowActive:  { borderColor: COLORS.green, backgroundColor: COLORS.greenLight },
-  couponLabel:      { fontSize: 14, fontWeight: FONT.bold, color: COLORS.gray800 },
-  couponSub:        { fontSize: 12, color: COLORS.gray400, marginTop: 2 },
-  plusHint:         { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: COLORS.primaryLight, marginHorizontal: 0, marginBottom: SPACING.sm, padding: SPACING.lg },
-  plusHintIcon:     { fontSize: 20, color: COLORS.primary },
-  plusHintTitle:    { fontSize: 13, fontWeight: FONT.black, color: COLORS.primaryDark },
-  plusHintSub:      { fontSize: 11, color: COLORS.primary, marginTop: 2 },
-  sumRow:           { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 },
-  sumLabel:         { fontSize: 14, color: COLORS.gray400 },
-  sumVal:           { fontSize: 14, fontWeight: FONT.bold, color: COLORS.gray800 },
-  totalLabel:       { fontSize: 16, fontWeight: FONT.black, color: COLORS.gray800 },
-  totalVal:         { fontSize: 20, fontWeight: FONT.black, color: COLORS.gray800 },
-  bottomBar:        { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', gap: 16, padding: SPACING.lg, backgroundColor: COLORS.white, borderTopWidth: 0.5, borderTopColor: COLORS.border, ...SHADOW.strong },
-  bottomLabel:      { fontSize: 12, color: COLORS.gray400 },
-  bottomTotal:      { fontSize: 20, fontWeight: FONT.black, color: COLORS.gray800 },
-  confirmBtn:       { flex: 1, backgroundColor: '#FFD700', borderRadius: RADIUS.lg, paddingVertical: 15, alignItems: 'center' },
-  confirmBtnTxt:    { fontSize: 15, fontWeight: FONT.black, color: COLORS.gray800 },
+  container: { flex: 1, backgroundColor: COLORS.gray50 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14, backgroundColor: COLORS.white, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
+  headerTitle: { fontSize: 20, fontWeight: FONT.black, color: COLORS.gray800 },
+  clearTxt: { fontSize: 14, color: COLORS.red, fontWeight: FONT.bold },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
+  emptyEmoji: { fontSize: 64, marginBottom: 16 },
+  emptyTitle: { fontSize: 18, fontWeight: FONT.black, color: COLORS.gray800, marginBottom: 8 },
+  emptySub: { fontSize: 14, color: COLORS.gray400, textAlign: 'center', marginBottom: 24 },
+  emptyBtn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingHorizontal: 32, paddingVertical: 14 },
+  emptyBtnTxt: { color: '#fff', fontWeight: FONT.black, fontSize: 15 },
+  itemsCard: { backgroundColor: COLORS.white, marginBottom: SPACING.sm },
+  item: { flexDirection: 'row', gap: 12, padding: SPACING.lg, alignItems: 'flex-start' },
+  checkbox: { width: 22, height: 22, borderRadius: 11, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center', marginTop: 4, flexShrink: 0 },
+  itemImg: { width: 80, height: 80, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', position: 'relative', flexShrink: 0, overflow: 'hidden' },
+  itemImgReal: { width: 80, height: 80, borderRadius: RADIUS.md },
+  itemDisc: { position: 'absolute', top: 4, left: 4, backgroundColor: COLORS.red, borderRadius: RADIUS.sm, paddingHorizontal: 4, paddingVertical: 2 },
+  itemDiscTxt: { color: '#fff', fontSize: 9, fontWeight: FONT.black },
+  itemInfo: { flex: 1 },
+  itemName: { fontSize: 13, fontWeight: FONT.semibold, color: COLORS.gray800, lineHeight: 18, marginBottom: 4 },
+  premBadge: { alignSelf: 'flex-start', backgroundColor: COLORS.primaryLight, borderRadius: RADIUS.sm, paddingHorizontal: 6, paddingVertical: 2, marginBottom: 6 },
+  premBadgeTxt: { fontSize: 10, color: COLORS.primary, fontWeight: FONT.bold },
+  itemPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 8 },
+  itemPrice: { fontSize: 16, fontWeight: FONT.black, color: COLORS.gray800 },
+  itemOldPrice: { fontSize: 12, color: COLORS.gray400, textDecorationLine: 'line-through' },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  qtyBtn: { width: 32, height: 32, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.white },
+  qtyBtnTxt: { fontSize: 18, fontWeight: FONT.bold, color: COLORS.gray800, lineHeight: 22 },
+  qtyNum: { fontSize: 15, fontWeight: FONT.black, color: COLORS.gray800, minWidth: 28, textAlign: 'center' },
+  deleteBtn: { marginLeft: 8, padding: 4 },
+  divider: { height: 0.5, backgroundColor: COLORS.border, marginHorizontal: SPACING.lg },
+  card: { backgroundColor: COLORS.white, marginBottom: SPACING.sm, padding: SPACING.lg },
+  cardTitle: { fontSize: 16, fontWeight: FONT.black, color: COLORS.gray800, marginBottom: 12 },
+  deliveryOpt: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border, marginBottom: 8 },
+  deliveryOptActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight },
+  radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: COLORS.border },
+  radioActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primary },
+  deliveryLabel: { fontSize: 14, fontWeight: FONT.bold, color: COLORS.gray800 },
+  deliveryDate: { fontSize: 12, color: COLORS.gray400, marginTop: 2 },
+  addressRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  addressTxt: { flex: 1, fontSize: 13, color: COLORS.primary, fontWeight: FONT.semibold },
+  couponRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border },
+  couponRowActive: { borderColor: COLORS.green, backgroundColor: COLORS.greenLight },
+  couponLabel: { fontSize: 14, fontWeight: FONT.bold, color: COLORS.gray800 },
+  couponSub: { fontSize: 12, color: COLORS.gray400, marginTop: 2 },
+  plusHint: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: COLORS.primaryLight, marginHorizontal: 0, marginBottom: SPACING.sm, padding: SPACING.lg },
+  plusHintIcon: { fontSize: 20, color: COLORS.primary },
+  plusHintTitle: { fontSize: 13, fontWeight: FONT.black, color: COLORS.primaryDark },
+  plusHintSub: { fontSize: 11, color: COLORS.primary, marginTop: 2 },
+  sumRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 },
+  sumLabel: { fontSize: 14, color: COLORS.gray400 },
+  sumVal: { fontSize: 14, fontWeight: FONT.bold, color: COLORS.gray800 },
+  totalLabel: { fontSize: 16, fontWeight: FONT.black, color: COLORS.gray800 },
+  totalVal: { fontSize: 20, fontWeight: FONT.black, color: COLORS.gray800 },
+  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', gap: 16, padding: SPACING.lg, backgroundColor: COLORS.white, borderTopWidth: 0.5, borderTopColor: COLORS.border, ...SHADOW.strong },
+  bottomLabel: { fontSize: 12, color: COLORS.gray400 },
+  bottomTotal: { fontSize: 20, fontWeight: FONT.black, color: COLORS.gray800 },
+  confirmBtn: { flex: 1, backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: 15, alignItems: 'center' },
+  confirmBtnTxt: { fontSize: 15, fontWeight: FONT.black, color: COLORS.white },
 });
