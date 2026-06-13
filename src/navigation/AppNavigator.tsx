@@ -1,5 +1,5 @@
 // src/navigation/AppNavigator.tsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -23,14 +23,15 @@ import SellerRegisterScreen   from '../screens/SellerRegisterScreen';
 import SellerAddProductScreen from '../screens/SellerAddProductScreen';
 import SellerProductsScreen   from '../screens/SellerProductsScreen';
 import SellerReviewsScreen    from '../screens/SellerReviewsScreen';
+import SellerOrdersScreen     from '../screens/SellerOrdersScreen';
+import SellerEditStore        from '../screens/SellerEditStore';
 
 import { COLORS, RADIUS, FONT } from '../theme';
 import { useCart, useNotifs, useFavs, useAuth } from '../context';
 
-// ── TIPOS ─────────────────────────────────────────────────────────
 export type RootStackParamList = {
   HomeMain:        undefined;
-  ProductDetail:   { productId: number };
+  ProductDetail:   { productId: number | string };
   Cart:            undefined;
   Notifications:   undefined;
   Profile:         undefined;
@@ -62,7 +63,6 @@ export type TabParamList = {
 const Tab   = createBottomTabNavigator<TabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-// ── STACKS ────────────────────────────────────────────────────────
 function HomeStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -86,6 +86,7 @@ function SearchStack() {
       <Stack.Screen name="SearchMain"    component={SearchScreen} />
       <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
       <Stack.Screen name="SellerStore"   component={SellerStoreScreen} />
+      <Stack.Screen name="Cart"          component={CartScreen} />
       <Stack.Screen name="Checkout"      component={CheckoutScreen} />
       <Stack.Screen name="OrderSuccess"  component={OrderSuccessScreen} />
     </Stack.Navigator>
@@ -97,8 +98,11 @@ function FavoritesStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Favorites"     component={FavoritesScreen} />
       <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+      <Stack.Screen name="Cart"          component={CartScreen} />
       <Stack.Screen name="Checkout"      component={CheckoutScreen} />
       <Stack.Screen name="OrderSuccess"  component={OrderSuccessScreen} />
+      <Stack.Screen name="Login"         component={LoginScreen} />
+      <Stack.Screen name="Register"      component={RegisterScreen} />
     </Stack.Navigator>
   );
 }
@@ -112,6 +116,7 @@ function ProfileStack() {
       <Stack.Screen name="OrderSuccess"     component={OrderSuccessScreen} />
       <Stack.Screen name="OrdersHistory"    component={OrdersHistoryScreen} />
       <Stack.Screen name="ProductDetail"    component={ProductDetailScreen} />
+      <Stack.Screen name="SellerStore"      component={SellerStoreScreen} />
       <Stack.Screen name="Login"            component={LoginScreen} />
       <Stack.Screen name="Register"         component={RegisterScreen} />
       <Stack.Screen name="SellerDashboard"  component={SellerDashboardScreen} />
@@ -119,11 +124,12 @@ function ProfileStack() {
       <Stack.Screen name="SellerAddProduct" component={SellerAddProductScreen} />
       <Stack.Screen name="SellerProducts"   component={SellerProductsScreen} />
       <Stack.Screen name="SellerReviews"    component={SellerReviewsScreen} />
+      <Stack.Screen name="SellerOrders"     component={SellerOrdersScreen} />
+      <Stack.Screen name="SellerEditStore"  component={SellerEditStore} />
     </Stack.Navigator>
   );
 }
 
-// ── TAB BAR ───────────────────────────────────────────────────────
 const TABS = [
   { name: 'HomeTab' as const,      icon: '🏠', label: 'Inicio'    },
   { name: 'SearchTab' as const,    icon: '🔍', label: 'Buscar'    },
@@ -177,7 +183,17 @@ function KaifTabBar({ state, navigation }: BottomTabBarProps) {
 
 // ── ROOT ──────────────────────────────────────────────────────────
 export default function AppNavigator() {
-  const { loading } = useAuth();
+  const { loading, user } = useAuth();
+  const { loadFavs, clearFavs } = useFavs();
+
+  // ── Cargar/limpiar favoritos según sesión ─────────────────────
+  useEffect(() => {
+    if (user?.id) {
+      loadFavs(user.id);
+    } else {
+      clearFavs();
+    }
+  }, [user?.id]);
 
   if (loading) {
     return (

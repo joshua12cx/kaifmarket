@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, ActivityIndicator, RefreshControl,
+  StyleSheet, ActivityIndicator, RefreshControl, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SPACING, RADIUS, FONT, SHADOW } from '../theme';
@@ -50,10 +50,7 @@ export default function SellerDashboardScreen({ navigation }: any) {
     if (!user) { setLoading(false); return; }
     try {
       const { data: sellerData } = await supabase
-        .from('sellers')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+        .from('sellers').select('*').eq('user_id', user.id).single();
 
       setSeller(sellerData);
       if (!sellerData) { setLoading(false); return; }
@@ -66,23 +63,32 @@ export default function SellerDashboardScreen({ navigation }: any) {
       const rows = (products || []) as ProductRow[];
 
       const totalProducts  = rows.length;
-      const activeProducts = rows.filter((p: ProductRow) => p.is_active).length;
-      const totalSales     = rows.reduce((s: number, p: ProductRow) => s + (p.sold || 0), 0);
-      const totalRevenue   = rows.reduce((s: number, p: ProductRow) => s + ((p.sold || 0) * (p.price || 0)), 0);
+      const activeProducts = rows.filter(p => p.is_active).length;
+      const totalSales     = rows.reduce((s, p) => s + (p.sold || 0), 0);
+      const totalRevenue   = rows.reduce((s, p) => s + ((p.sold || 0) * (p.price || 0)), 0);
       const avgRating      = rows.length
-        ? rows.reduce((s: number, p: ProductRow) => s + (p.rating || 0), 0) / rows.length
-        : 0;
-      const totalReviews   = rows.reduce((s: number, p: ProductRow) => s + (p.review_count || 0), 0);
+        ? rows.reduce((s, p) => s + (p.rating || 0), 0) / rows.length : 0;
+      const totalReviews   = rows.reduce((s, p) => s + (p.review_count || 0), 0);
 
       setStats({ totalProducts, activeProducts, totalSales, totalRevenue, avgRating, totalReviews });
 
-      const { data: ordersData } = await supabase
-        .from('orders')
-        .select('id, total, status, created_at, buyer_name, buyer_email')
-        .order('created_at', { ascending: false })
-        .limit(5);
+      const productIds = rows.map(p => p.id);
+      if (productIds.length > 0) {
+        const { data: orderItems } = await supabase
+          .from('order_items').select('order_id').in('product_id', productIds);
 
-      setOrders(ordersData || []);
+        const orderIds = [...new Set((orderItems || []).map((i: any) => i.order_id))];
+
+        if (orderIds.length > 0) {
+          const { data: ordersData } = await supabase
+            .from('orders')
+            .select('id, total, status, created_at, buyer_name, buyer_email')
+            .in('id', orderIds)
+            .order('created_at', { ascending: false })
+            .limit(5);
+          setOrders(ordersData || []);
+        } else { setOrders([]); }
+      } else { setOrders([]); }
 
     } catch (e) {
       if (__DEV__) { console.log('[SELLER] fetchData error:', e); }
@@ -93,7 +99,6 @@ export default function SellerDashboardScreen({ navigation }: any) {
   }, [user]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
-
   const onRefresh = () => { setRefreshing(true); fetchData(); };
 
   if (!user) {
@@ -131,9 +136,7 @@ export default function SellerDashboardScreen({ navigation }: any) {
           <Text style={{ fontSize: 52, marginBottom: 16 }}>🏪</Text>
           <Text style={sd.emptyTitle}>Aún no tienes una tienda</Text>
           <Text style={sd.emptySub}>Regístrate como vendedor para empezar a vender en KaifMarket</Text>
-          <TouchableOpacity
-            style={sd.emptyBtn}
-            onPress={() => navigation.navigate('SellerRegister')}>
+          <TouchableOpacity style={sd.emptyBtn} onPress={() => navigation.navigate('SellerRegister')}>
             <Text style={sd.emptyBtnTxt}>Crear mi tienda</Text>
           </TouchableOpacity>
         </View>
@@ -171,9 +174,17 @@ export default function SellerDashboardScreen({ navigation }: any) {
 
           {/* ── PERFIL TIENDA ── */}
           <View style={sd.storeCard}>
-            <View style={sd.storeAvatar}>
-              <Text style={{ fontSize: 36 }}>🏪</Text>
-            </View>
+            {seller?.logo_url ? (
+              <Image
+                source={{ uri: seller.logo_url }}
+                style={sd.storeLogoImg}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={sd.storeAvatar}>
+                <Text style={{ fontSize: 36 }}>🏪</Text>
+              </View>
+            )}
             <View style={{ flex: 1 }}>
               <View style={sd.storeNameRow}>
                 <Text style={sd.storeName}>{seller?.name || 'Mi Tienda'}</Text>
@@ -263,16 +274,30 @@ export default function SellerDashboardScreen({ navigation }: any) {
           )}
 
           {/* ── PEDIDOS RECIENTES ── */}
-          {orders.length > 0 && (
-            <View style={sd.section}>
-              <View style={sd.sectionHeader}>
-                <Text style={sd.sectionTitle}>🛍️ Ventas recientes</Text>
-                <TouchableOpacity onPress={() => navigation.navigate('SellerOrders', { sellerId: seller?.id })}>
-                  <Text style={sd.sectionLink}>Ver todas ›</Text>
-                </TouchableOpacity>
+          <View style={sd.section}>
+            <View style={sd.sectionHeader}>
+              <Text style={sd.sectionTitle}>🛍️ Ventas recientes</Text>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('SellerOrders', { sellerId: seller?.id })}>
+                <Text style={sd.sectionLink}>Ver todas ›</Text>
+              </TouchableOpacity>
+            </View>
+
+            {orders.length === 0 ? (
+              <View style={sd.emptyOrders}>
+                <Text style={{ fontSize: 32, marginBottom: 8 }}>📭</Text>
+                <Text style={sd.emptyOrdersTxt}>Aún no tienes ventas</Text>
+                <Text style={sd.emptyOrdersSub}>
+                  Cuando alguien compre tus productos aparecerán aquí
+                </Text>
               </View>
-              {orders.slice(0, 3).map(order => (
-                <View key={order.id} style={sd.orderCard}>
+            ) : (
+              orders.slice(0, 3).map(order => (
+                <TouchableOpacity
+                  key={order.id}
+                  style={sd.orderCard}
+                  onPress={() => navigation.navigate('SellerOrders', { sellerId: seller?.id })}
+                  activeOpacity={0.85}>
                   <View style={sd.orderLeft}>
                     <Text style={sd.orderBuyer}>{order.buyer_name || 'Cliente'}</Text>
                     <Text style={sd.orderEmail}>{order.buyer_email}</Text>
@@ -283,21 +308,30 @@ export default function SellerDashboardScreen({ navigation }: any) {
                   <View style={sd.orderRight}>
                     <Text style={sd.orderTotal}>S/ {order.total}</Text>
                     <View style={[sd.orderStatus, {
-                      backgroundColor: order.status === 'delivered' ? COLORS.greenLight : COLORS.amberLight,
+                      backgroundColor:
+                        order.status === 'delivered' ? COLORS.greenLight :
+                        order.status === 'shipped'   ? COLORS.blueLight  :
+                        order.status === 'cancelled' ? '#FFE5E5'          :
+                        COLORS.amberLight,
                     }]}>
                       <Text style={[sd.orderStatusTxt, {
-                        color: order.status === 'delivered' ? COLORS.green : COLORS.amber,
+                        color:
+                          order.status === 'delivered' ? COLORS.green :
+                          order.status === 'shipped'   ? COLORS.blue  :
+                          order.status === 'cancelled' ? COLORS.red   :
+                          COLORS.amber,
                       }]}>
                         {order.status === 'processing' ? 'Procesando' :
                          order.status === 'delivered'  ? 'Entregado'  :
-                         order.status === 'shipped'    ? 'En camino'  : order.status}
+                         order.status === 'shipped'    ? 'En camino'  :
+                         order.status === 'cancelled'  ? 'Cancelado'  : order.status}
                       </Text>
                     </View>
                   </View>
-                </View>
-              ))}
-            </View>
-          )}
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
 
           {/* ── TIP ── */}
           <View style={sd.tipCard}>
@@ -326,51 +360,55 @@ export default function SellerDashboardScreen({ navigation }: any) {
 }
 
 const sd = StyleSheet.create({
-  container:      { flex: 1, backgroundColor: COLORS.gray50 },
-  header:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14, backgroundColor: COLORS.white, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
-  backBtn:        { width: 36, height: 36, backgroundColor: COLORS.gray100, borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
-  backTxt:        { fontSize: 24, color: COLORS.gray800, fontWeight: FONT.bold, lineHeight: 28 },
-  headerTitle:    { fontSize: 17, fontWeight: FONT.black, color: COLORS.gray800 },
-  settingsBtn:    { width: 36, height: 36, backgroundColor: COLORS.gray100, borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
-  empty:          { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-  emptyTitle:     { fontSize: 18, fontWeight: FONT.black, color: COLORS.gray800, textAlign: 'center', marginBottom: 8 },
-  emptySub:       { fontSize: 14, color: COLORS.gray400, textAlign: 'center', marginBottom: 24, lineHeight: 20 },
-  emptyBtn:       { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingHorizontal: 32, paddingVertical: 14 },
-  emptyBtnTxt:    { color: COLORS.white, fontWeight: FONT.black, fontSize: 15 },
-  storeCard:      { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: COLORS.white, padding: SPACING.lg, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
-  storeAvatar:    { width: 64, height: 64, backgroundColor: COLORS.primaryLight, borderRadius: RADIUS.xl, alignItems: 'center', justifyContent: 'center' },
-  storeNameRow:   { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' },
-  storeName:      { fontSize: 18, fontWeight: FONT.black, color: COLORS.gray800 },
-  verifiedBadge:  { backgroundColor: COLORS.primary, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  verifiedTxt:    { color: '#fff', fontSize: 10, fontWeight: FONT.black },
-  premiumBadge:   { backgroundColor: COLORS.amberLight, borderRadius: RADIUS.sm, paddingHorizontal: 6, paddingVertical: 2 },
-  premiumTxt:     { color: COLORS.amber, fontSize: 9, fontWeight: FONT.black },
-  storeLocation:  { fontSize: 12, color: COLORS.gray400, marginBottom: 4 },
-  storeDesc:      { fontSize: 12, color: COLORS.gray600, lineHeight: 17 },
-  actionsRow:     { flexDirection: 'row', backgroundColor: COLORS.white, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
-  actionBtn:      { flex: 1, alignItems: 'center', paddingVertical: SPACING.lg, borderRightWidth: 0.5, borderRightColor: COLORS.border },
-  actionLabel:    { fontSize: 11, fontWeight: FONT.bold, color: COLORS.gray600, textAlign: 'center' },
-  section:        { padding: SPACING.lg },
-  sectionHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md },
-  sectionTitle:   { fontSize: 16, fontWeight: FONT.black, color: COLORS.gray800, marginBottom: SPACING.md },
-  sectionLink:    { fontSize: 13, color: COLORS.primary, fontWeight: FONT.bold },
-  statsGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  statCard:       { width: '30%', backgroundColor: COLORS.white, borderRadius: RADIUS.lg, padding: SPACING.md, alignItems: 'center', borderWidth: 0.5, borderColor: COLORS.border, ...SHADOW.card },
-  statVal:        { fontSize: 18, fontWeight: FONT.black, color: COLORS.primary, marginBottom: 4 },
-  statLbl:        { fontSize: 11, color: COLORS.gray400, textAlign: 'center' },
-  orderCard:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.white, borderRadius: RADIUS.lg, padding: SPACING.md, marginBottom: SPACING.sm, borderWidth: 0.5, borderColor: COLORS.border, ...SHADOW.card },
-  orderLeft:      { flex: 1 },
-  orderBuyer:     { fontSize: 14, fontWeight: FONT.bold, color: COLORS.gray800 },
-  orderEmail:     { fontSize: 11, color: COLORS.gray400, marginTop: 2 },
-  orderDate:      { fontSize: 11, color: COLORS.gray400, marginTop: 2 },
-  orderRight:     { alignItems: 'flex-end', gap: 6 },
-  orderTotal:     { fontSize: 16, fontWeight: FONT.black, color: COLORS.gray800 },
-  orderStatus:    { borderRadius: RADIUS.full, paddingHorizontal: 8, paddingVertical: 3 },
-  orderStatusTxt: { fontSize: 11, fontWeight: FONT.bold },
-  tipCard:        { flexDirection: 'row', gap: 12, backgroundColor: COLORS.primaryLight, marginHorizontal: SPACING.lg, borderRadius: RADIUS.xl, padding: SPACING.lg },
-  tipIcon:        { fontSize: 24 },
-  tipTitle:       { fontSize: 13, fontWeight: FONT.black, color: COLORS.primaryDark, marginBottom: 4 },
-  tipTxt:         { fontSize: 12, color: COLORS.primary, lineHeight: 18 },
-  fab:            { position: 'absolute', right: SPACING.lg, backgroundColor: COLORS.primary, borderRadius: RADIUS.full, paddingHorizontal: 20, paddingVertical: 14, ...SHADOW.strong },
-  fabTxt:         { color: COLORS.white, fontWeight: FONT.black, fontSize: 14 },
+  container:       { flex: 1, backgroundColor: COLORS.gray50 },
+  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14, backgroundColor: COLORS.white, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
+  backBtn:         { width: 36, height: 36, backgroundColor: COLORS.gray100, borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
+  backTxt:         { fontSize: 24, color: COLORS.gray800, fontWeight: FONT.bold, lineHeight: 28 },
+  headerTitle:     { fontSize: 17, fontWeight: FONT.black, color: COLORS.gray800 },
+  settingsBtn:     { width: 36, height: 36, backgroundColor: COLORS.gray100, borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
+  empty:           { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
+  emptyTitle:      { fontSize: 18, fontWeight: FONT.black, color: COLORS.gray800, textAlign: 'center', marginBottom: 8 },
+  emptySub:        { fontSize: 14, color: COLORS.gray400, textAlign: 'center', marginBottom: 24, lineHeight: 20 },
+  emptyBtn:        { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingHorizontal: 32, paddingVertical: 14 },
+  emptyBtnTxt:     { color: COLORS.white, fontWeight: FONT.black, fontSize: 15 },
+  emptyOrders:     { alignItems: 'center', paddingVertical: 24, backgroundColor: COLORS.white, borderRadius: RADIUS.lg, borderWidth: 0.5, borderColor: COLORS.border },
+  emptyOrdersTxt:  { fontSize: 14, fontWeight: FONT.black, color: COLORS.gray800, marginBottom: 4 },
+  emptyOrdersSub:  { fontSize: 12, color: COLORS.gray400, textAlign: 'center', paddingHorizontal: 20, lineHeight: 18 },
+  storeCard:       { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: COLORS.white, padding: SPACING.lg, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
+  storeAvatar:     { width: 64, height: 64, backgroundColor: COLORS.primaryLight, borderRadius: RADIUS.xl, alignItems: 'center', justifyContent: 'center' },
+  storeLogoImg:    { width: 64, height: 64, borderRadius: RADIUS.xl },
+  storeNameRow:    { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' },
+  storeName:       { fontSize: 18, fontWeight: FONT.black, color: COLORS.gray800 },
+  verifiedBadge:   { backgroundColor: COLORS.primary, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  verifiedTxt:     { color: '#fff', fontSize: 10, fontWeight: FONT.black },
+  premiumBadge:    { backgroundColor: COLORS.amberLight, borderRadius: RADIUS.sm, paddingHorizontal: 6, paddingVertical: 2 },
+  premiumTxt:      { color: COLORS.amber, fontSize: 9, fontWeight: FONT.black },
+  storeLocation:   { fontSize: 12, color: COLORS.gray400, marginBottom: 4 },
+  storeDesc:       { fontSize: 12, color: COLORS.gray600, lineHeight: 17 },
+  actionsRow:      { flexDirection: 'row', backgroundColor: COLORS.white, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
+  actionBtn:       { flex: 1, alignItems: 'center', paddingVertical: SPACING.lg, borderRightWidth: 0.5, borderRightColor: COLORS.border },
+  actionLabel:     { fontSize: 11, fontWeight: FONT.bold, color: COLORS.gray600, textAlign: 'center' },
+  section:         { padding: SPACING.lg },
+  sectionHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md },
+  sectionTitle:    { fontSize: 16, fontWeight: FONT.black, color: COLORS.gray800, marginBottom: SPACING.md },
+  sectionLink:     { fontSize: 13, color: COLORS.primary, fontWeight: FONT.bold },
+  statsGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  statCard:        { width: '30%', backgroundColor: COLORS.white, borderRadius: RADIUS.lg, padding: SPACING.md, alignItems: 'center', borderWidth: 0.5, borderColor: COLORS.border, ...SHADOW.card },
+  statVal:         { fontSize: 18, fontWeight: FONT.black, color: COLORS.primary, marginBottom: 4 },
+  statLbl:         { fontSize: 11, color: COLORS.gray400, textAlign: 'center' },
+  orderCard:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.white, borderRadius: RADIUS.lg, padding: SPACING.md, marginBottom: SPACING.sm, borderWidth: 0.5, borderColor: COLORS.border, ...SHADOW.card },
+  orderLeft:       { flex: 1 },
+  orderBuyer:      { fontSize: 14, fontWeight: FONT.bold, color: COLORS.gray800 },
+  orderEmail:      { fontSize: 11, color: COLORS.gray400, marginTop: 2 },
+  orderDate:       { fontSize: 11, color: COLORS.gray400, marginTop: 2 },
+  orderRight:      { alignItems: 'flex-end', gap: 6 },
+  orderTotal:      { fontSize: 16, fontWeight: FONT.black, color: COLORS.gray800 },
+  orderStatus:     { borderRadius: RADIUS.full, paddingHorizontal: 8, paddingVertical: 3 },
+  orderStatusTxt:  { fontSize: 11, fontWeight: FONT.bold },
+  tipCard:         { flexDirection: 'row', gap: 12, backgroundColor: COLORS.primaryLight, marginHorizontal: SPACING.lg, borderRadius: RADIUS.xl, padding: SPACING.lg },
+  tipIcon:         { fontSize: 24 },
+  tipTitle:        { fontSize: 13, fontWeight: FONT.black, color: COLORS.primaryDark, marginBottom: 4 },
+  tipTxt:          { fontSize: 12, color: COLORS.primary, lineHeight: 18 },
+  fab:             { position: 'absolute', right: SPACING.lg, backgroundColor: COLORS.primary, borderRadius: RADIUS.full, paddingHorizontal: 20, paddingVertical: 14, ...SHADOW.strong },
+  fabTxt:          { color: COLORS.white, fontWeight: FONT.black, fontSize: 14 },
 });

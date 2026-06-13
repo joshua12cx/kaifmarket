@@ -3,23 +3,24 @@ import React, {
   createContext, useContext, useReducer,
   useMemo, useState, useEffect,
 } from 'react';
+import { Alert } from 'react-native';
 import { supabase, AuthUser } from '../lib/supabase';
 import { NOTIFICATIONS as NOTIF_DATA } from '../data';
 
 // ══════════════════════════════════════════════════════════════════
-//  CART CONTEXT — soporta id numérico (estático) y string (Supabase)
+//  CART CONTEXT
 // ══════════════════════════════════════════════════════════════════
 interface CartState { items: Record<string, number>; }
 type CartAction =
-  | { type: 'ADD';       id: string | number }
-  | { type: 'REMOVE';    id: string | number }
+  | { type: 'ADD'; id: string | number }
+  | { type: 'REMOVE'; id: string | number }
   | { type: 'INCREMENT'; id: string | number }
   | { type: 'DECREMENT'; id: string | number }
   | { type: 'CLEAR' };
 
 interface CartContextType {
-  items:      Record<string, number>;
-  dispatch:   React.Dispatch<CartAction>;
+  items: Record<string, number>;
+  dispatch: React.Dispatch<CartAction>;
   totalItems: number;
 }
 
@@ -71,33 +72,33 @@ export const useCart = () => useContext(CartContext)!;
 //  AUTH CONTEXT
 // ══════════════════════════════════════════════════════════════════
 interface AuthContextType {
-  user:            AuthUser | null;
+  user: AuthUser | null;
   isAuthenticated: boolean;
-  isPlus:          boolean;
-  isSeller:        boolean;
-  loading:         boolean;
-  login:           (email: string, password: string) => Promise<{ error?: string }>;
-  register:        (data: RegisterData) => Promise<{ error?: string }>;
-  logout:          () => Promise<void>;
-  activatePlus:    () => void;
-  updateUser:      (data: Partial<AuthUser>) => void;
+  isPlus: boolean;
+  isSeller: boolean;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<{ error?: string }>;
+  register: (data: RegisterData) => Promise<{ error?: string }>;
+  logout: () => Promise<void>;
+  activatePlus: () => void;
+  updateUser: (data: Partial<AuthUser>) => void;
 }
 
 export interface RegisterData {
-  name:     string;
-  email:    string;
+  name: string;
+  email: string;
   password: string;
-  gender:   'male' | 'female' | 'other';
+  gender: 'male' | 'female' | 'other';
   isSeller: boolean;
-  phone?:   string;
+  phone?: string;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user,    setUser]    = useState<AuthUser | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isPlus,  setIsPlus]  = useState(false);
+  const [isPlus, setIsPlus] = useState(false);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -119,9 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('users').select('*').eq('id', userId).single();
-
       if (__DEV__) { console.log('[AUTH] fetchProfile:', { data, error }); }
-
       if (data && !error) {
         setUser(data as AuthUser);
         setIsPlus(data.is_plus || false);
@@ -133,48 +132,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
-      if (__DEV__) { console.log('[AUTH] Login start:', email); }
-
       const { data, error } = await supabase.auth.signInWithPassword({
-        email:    email.trim().toLowerCase(),
-        password,
+        email: email.trim().toLowerCase(), password,
       });
-
-      if (__DEV__) { console.log('[AUTH] Login done:', { userId: data?.user?.id, error }); }
-
       if (error) {
-        if (error.message.includes('Invalid login')) {
-          return { error: 'Email o contraseña incorrectos' };
-        }
-        if (error.message.includes('Email not confirmed')) {
-          return { error: 'Confirma tu email antes de entrar' };
-        }
+        if (error.message.includes('Invalid login')) { return { error: 'Email o contraseña incorrectos' }; }
+        if (error.message.includes('Email not confirmed')) { return { error: 'Confirma tu email antes de entrar' }; }
         return { error: `Error: ${error.message}` };
       }
-
-      if (data?.user) {
-        await fetchUserProfile(data.user.id);
-      }
-
+      if (data?.user) { await fetchUserProfile(data.user.id); }
       return {};
-
     } catch (e: any) {
-      if (__DEV__) { console.log('[AUTH] Login error:', e?.message); }
       return { error: 'Error de conexión. Verifica tu internet.' };
     }
   };
 
   const register = async (data: RegisterData) => {
     try {
-      if (__DEV__) { console.log('[AUTH] Register start:', data.email); }
-
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email:    data.email.trim().toLowerCase(),
+        email: data.email.trim().toLowerCase(),
         password: data.password,
-        options:  { data: { name: data.name } },
+        options: { data: { name: data.name } },
       });
-
-      if (__DEV__) { console.log('[AUTH] signUp:', { userId: authData?.user?.id, authError }); }
 
       if (authError) {
         if (authError.message.includes('already registered')) {
@@ -183,83 +162,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: 'Error al crear la cuenta. Intenta de nuevo.' };
       }
 
-      if (!authData.user) {
-        return { error: 'Error inesperado. Intenta de nuevo.' };
-      }
+      if (!authData.user) { return { error: 'Error inesperado. Intenta de nuevo.' }; }
 
       const initials = data.name
         ? data.name.trim().split(' ').map((w: string) => w[0]).join('').substring(0, 2).toUpperCase()
         : 'KM';
 
-      const { error: profileError } = await supabase
-        .from('users')
-        .insert({
-          id:        authData.user.id,
-          email:     data.email.trim().toLowerCase(),
-          name:      data.name      || null,
-          avatar:    initials,
-          gender:    data.gender    || null,
-          phone:     data.phone     || null,
-          is_plus:   false,
-          is_seller: data.isSeller  || false,
-          location:  'Lima, Perú',
-        });
-
-      if (__DEV__) { console.log('[AUTH] Profile insert:', { profileError }); }
+      await supabase.from('users').insert({
+        id: authData.user.id,
+        email: data.email.trim().toLowerCase(),
+        name: data.name || null,
+        avatar: initials,
+        gender: data.gender || null,
+        phone: data.phone || null,
+        is_plus: false,
+        is_seller: data.isSeller || false,
+        location: 'Lima, Perú',
+      });
 
       // Vincular pedidos de invitado
       const { data: guestOrders } = await supabase
-        .from('orders')
-        .select('id')
+        .from('orders').select('id')
         .eq('buyer_email', data.email.trim().toLowerCase())
         .is('buyer_id', null);
 
       if (guestOrders && guestOrders.length > 0) {
-        await supabase
-          .from('orders')
+        await supabase.from('orders')
           .update({ buyer_id: authData.user.id })
           .eq('buyer_email', data.email.trim().toLowerCase())
           .is('buyer_id', null);
-        if (__DEV__) { console.log('[AUTH] Linked', guestOrders.length, 'guest orders'); }
       }
 
       if (data.isSeller) {
         await supabase.from('sellers').insert({
-          user_id:     authData.user.id,
-          name:        data.name || 'Mi Tienda',
-          is_premium:  false,
+          user_id: authData.user.id,
+          name: data.name || 'Mi Tienda',
+          is_premium: false,
           is_verified: false,
-          rating:      5.0,
+          rating: 5.0,
           total_sales: 0,
-          followers:   0,
-          location:    'Lima, Perú',
+          followers: 0,
+          location: 'Lima, Perú',
         });
       }
 
       return {};
-
     } catch (e) {
-      if (__DEV__) { console.log('[AUTH] Register error:', e); }
       return { error: 'Error de conexión. Verifica tu internet.' };
     }
   };
 
   const logout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (e) {
-      if (__DEV__) { console.log('[AUTH] Logout error:', e); }
-    } finally {
-      setUser(null);
-      setIsPlus(false);
-    }
+    try { await supabase.auth.signOut(); }
+    catch (e) { if (__DEV__) { console.log('[AUTH] Logout error:', e); } }
+    finally { setUser(null); setIsPlus(false); }
   };
 
   const activatePlus = () => {
     setIsPlus(true);
-    if (user) {
-      supabase.from('users').update({ is_plus: true }).eq('id', user.id);
-    }
+    if (user) { supabase.from('users').update({ is_plus: true }).eq('id', user.id); }
   };
 
   const updateUser = (data: Partial<AuthUser>) => {
@@ -271,7 +232,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       isAuthenticated: !!user,
       isPlus,
-      isSeller:  user?.is_seller || false,
+      isSeller: user?.is_seller || false,
       loading,
       login,
       register,
@@ -286,33 +247,104 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export const useAuth = () => useContext(AuthContext)!;
 
 // ══════════════════════════════════════════════════════════════════
-//  FAVS CONTEXT — también soporta string IDs
+//  FAVS CONTEXT — persistente en Supabase para usuarios logueados
 // ══════════════════════════════════════════════════════════════════
 interface FavContextType {
-  favs:     Record<string, boolean>;
-  toggle:   (id: string | number) => void;
-  isFav:    (id: string | number) => boolean;
+  favs: Record<string, boolean>;
+  toggle: (id: string | number, onNeedLogin?: () => void) => void;
+  isFav: (id: string | number) => boolean;
   favCount: number;
+  loadFavs: (userId: string) => Promise<void>;
+  clearFavs: () => void;
 }
 
 const FavContext = createContext<FavContextType | null>(null);
 
 export function FavProvider({ children }: { children: React.ReactNode }) {
   const [favs, setFavs] = useState<Record<string, boolean>>({});
-  const toggle = (id: string | number) =>
+  const [userId, setUserId] = useState<string | null>(null);
+
+  // ── Cargar favoritos desde Supabase al iniciar sesión ─────────
+  const loadFavs = async (uid: string) => {
+    setUserId(uid);
+    try {
+      const { data } = await supabase
+        .from('favorites')
+        .select('product_id')
+        .eq('user_id', uid);
+
+      if (data) {
+        const map: Record<string, boolean> = {};
+        data.forEach((f: any) => { map[String(f.product_id)] = true; });
+        setFavs(map);
+        if (__DEV__) { console.log('[FAVS] Loaded:', data.length, 'favorites'); }
+      }
+    } catch (e) {
+      if (__DEV__) { console.log('[FAVS] Load error:', e); }
+    }
+  };
+
+  // ── Limpiar favoritos al cerrar sesión ────────────────────────
+  const clearFavs = () => {
+    setFavs({});
+    setUserId(null);
+  };
+
+  // ── Toggle — requiere login ───────────────────────────────────
+  const toggle = (id: string | number, onNeedLogin?: () => void) => {
+    // Si no hay usuario logueado → Alert
+    if (!userId) {
+      Alert.alert(
+        '❤️ Guardar favorito',
+        'Inicia sesión para guardar tus productos favoritos y acceder desde cualquier dispositivo.',
+        [
+          { text: 'Ahora no', style: 'cancel' },
+          {
+            text: 'Iniciar sesión',
+            onPress: () => { if (onNeedLogin) { onNeedLogin(); } },
+          },
+        ],
+      );
+      return;
+    }
+
+    const key = String(id);
+    const isAdding = !favs[key];
+
+    // Actualización optimista
     setFavs(prev => {
-      const key  = String(id);
       const next = { ...prev };
       if (next[key]) { delete next[key]; }
       else { next[key] = true; }
       return next;
     });
+
+    // Sincronizar con Supabase
+    if (isAdding) {
+      supabase.from('favorites').insert({
+        user_id: userId,
+        product_id: key,
+      }).then((res: any) => {
+        if (res.error && __DEV__) { console.log('[FAVS] Insert error:', res.error); }
+      });
+    } else {
+      supabase.from('favorites').delete()
+        .eq('user_id', userId)
+        .eq('product_id', key)
+        .then((res: any) => {
+          if (res.error && __DEV__) { console.log('[FAVS] Delete error:', res.error); }
+        });
+    }
+  };
+
   return (
     <FavContext.Provider value={{
       favs,
       toggle,
-      isFav:    id => !!favs[String(id)],
-      favCount: Object.keys(favs).length,
+      isFav: id => !!favs[String(id)],
+      favCount: Object.keys(favs).filter(k => favs[k]).length,
+      loadFavs,
+      clearFavs,
     }}>
       {children}
     </FavContext.Provider>
@@ -325,10 +357,10 @@ export const useFavs = () => useContext(FavContext)!;
 // ══════════════════════════════════════════════════════════════════
 interface NotifContextType {
   notifications: any[];
-  unreadCount:   number;
-  markRead:      (id: number) => void;
-  markAllRead:   () => void;
-  deleteNotif:   (id: number) => void;
+  unreadCount: number;
+  markRead: (id: number) => void;
+  markAllRead: () => void;
+  deleteNotif: (id: number) => void;
 }
 
 const NotifContext = createContext<NotifContextType | null>(null);
@@ -336,7 +368,7 @@ const NotifContext = createContext<NotifContextType | null>(null);
 export function NotifProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState(NOTIF_DATA);
   const unreadCount = notifications.filter(n => !n.read).length;
-  const markRead    = (id: number) =>
+  const markRead = (id: number) =>
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
   const markAllRead = () =>
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));

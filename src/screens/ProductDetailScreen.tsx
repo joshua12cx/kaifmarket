@@ -25,13 +25,13 @@ export default function ProductDetailScreen({ route, navigation }: any) {
   const { isFav, toggle }   = useFavs();
   const { user }            = useAuth();
 
-  const [data,       setData]       = useState<any>(null);
-  const [seller,     setSeller]     = useState<any>(null);
-  const [loading,    setLoading]    = useState(true);
-  const [activeImg,  setActiveImg]  = useState(0);
-  const [activeTab,  setActiveTab]  = useState<'info' | 'specs' | 'reviews'>('info');
-  const [showCoupon, setShowCoupon] = useState(true);
-  const [fullscreen, setFullscreen] = useState(false);
+  const [data,          setData]          = useState<any>(null);
+  const [seller,        setSeller]        = useState<any>(null);
+  const [loading,       setLoading]       = useState(true);
+  const [activeImg,     setActiveImg]     = useState(0);
+  const [activeTab,     setActiveTab]     = useState<'info' | 'specs' | 'reviews'>('info');
+  const [showCoupon,    setShowCoupon]    = useState(true);
+  const [fullscreen,    setFullscreen]    = useState(false);
   const [addedFeedback, setAddedFeedback] = useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -42,8 +42,17 @@ export default function ProductDetailScreen({ route, navigation }: any) {
         if (typeof productId === 'string') {
           const { data: sp, error } = await supabase
             .from('products').select('*').eq('id', productId).single();
+
           if (sp && !error) {
-            setData(normalizeSupabaseProduct(sp));
+            // ── Cargar specs de Supabase ──────────────────────
+            const { data: specsData } = await supabase
+              .from('product_specs')
+              .select('key, value, order_num')
+              .eq('product_id', productId)
+              .order('order_num', { ascending: true });
+
+            setData(normalizeSupabaseProduct(sp, specsData || []));
+
             if (sp.seller_id) {
               const { data: sd } = await supabase
                 .from('sellers').select('*').eq('id', sp.seller_id).single();
@@ -72,7 +81,8 @@ export default function ProductDetailScreen({ route, navigation }: any) {
     fetchProduct();
   }, [productId]);
 
-  const normalizeSupabaseProduct = (p: any) => ({
+  // ── Normalizar con specs de Supabase ──────────────────────────
+  const normalizeSupabaseProduct = (p: any, specs: any[]) => ({
     ...p,
     images:      [p.image_url, p.image_url_2, p.image_url_3].filter(Boolean),
     imageUrls:   [p.image_url, p.image_url_2, p.image_url_3].filter(Boolean),
@@ -80,7 +90,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
     oldPrice:    p.old_price,
     bgColor:     p.bg_color || '#F5F5F5',
     reviews:     p.review_count || 0,
-    specs:       [],
+    specs:       specs, // ← specs reales de Supabase
     category:    p.category_id,
   });
 
@@ -113,7 +123,6 @@ export default function ProductDetailScreen({ route, navigation }: any) {
     ? (p.imageUrls.length > 0 ? p.imageUrls : [null])
     : (p.images || [p.emoji]);
 
-  // ── Agregar al carrito con feedback visual ────────────────────
   const handleAddToCart = () => {
     dispatch({ type: 'ADD', id: p.id });
     setAddedFeedback(true);
@@ -174,7 +183,6 @@ export default function ProductDetailScreen({ route, navigation }: any) {
           <TouchableOpacity style={pd.topBtn} onPress={() => toggle(p.id)}>
             <Text style={{ fontSize: 18 }}>{isFav(p.id) ? '❤️' : '🤍'}</Text>
           </TouchableOpacity>
-          {/* Icono carrito — navega al carrito directamente */}
           <TouchableOpacity
             style={[pd.topBtn, { position: 'relative' }]}
             onPress={() => navigation.navigate('Cart')}>
@@ -296,37 +304,51 @@ export default function ProductDetailScreen({ route, navigation }: any) {
                 style={[pd.tab, activeTab === tab && pd.tabActive]}
                 onPress={() => setActiveTab(tab)}>
                 <Text style={[pd.tabTxt, activeTab === tab && pd.tabTxtActive]}>
-                  {tab === 'info' ? 'Descripción' : tab === 'specs' ? 'Características' : 'Reseñas'}
+                  {tab === 'info'    ? 'Descripción' :
+                   tab === 'specs'   ? `Características${p.specs?.length > 0 ? ` (${p.specs.length})` : ''}` :
+                   'Reseñas'}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
 
+          {/* ── TAB: INFO ── */}
           {activeTab === 'info' && (
             <View style={pd.tabContent}>
               <Text style={pd.descText}>{p.description || 'Sin descripción disponible.'}</Text>
             </View>
           )}
 
+          {/* ── TAB: SPECS ── */}
           {activeTab === 'specs' && (
             <View style={pd.tabContent}>
               {p.specs && p.specs.length > 0 ? (
                 p.specs.map((spec: any, i: number) => {
+                  // Soporta tanto objetos {key, value} como strings "key: value"
                   const key = typeof spec === 'string' ? spec.split(': ')[0] : spec.key;
                   const val = typeof spec === 'string' ? spec.split(': ')[1] : spec.value;
                   return (
-                    <View key={i} style={[pd.specRow, { backgroundColor: i % 2 === 0 ? COLORS.gray100 : COLORS.white }]}>
+                    <View
+                      key={i}
+                      style={[pd.specRow, { backgroundColor: i % 2 === 0 ? COLORS.gray100 : COLORS.white }]}>
                       <Text style={pd.specKey}>{key}</Text>
-                      <Text style={pd.specVal}>{val}</Text>
+                      <Text style={pd.specVal}>{val || '—'}</Text>
                     </View>
                   );
                 })
               ) : (
-                <Text style={{ color: COLORS.gray400, fontSize: 14 }}>Sin especificaciones disponibles.</Text>
+                <View style={pd.specsEmpty}>
+                  <Text style={{ fontSize: 32, marginBottom: 8 }}>📋</Text>
+                  <Text style={pd.specsEmptyTxt}>Sin especificaciones disponibles</Text>
+                  <Text style={pd.specsEmptySub}>
+                    El vendedor no ha agregado características para este producto
+                  </Text>
+                </View>
               )}
             </View>
           )}
 
+          {/* ── TAB: REVIEWS ── */}
           {activeTab === 'reviews' && (
             <View style={pd.tabContent}>
               <View style={pd.ratingSum}>
@@ -367,19 +389,34 @@ export default function ProductDetailScreen({ route, navigation }: any) {
               onPress={() => navigation.navigate('SellerStore', { sellerId: seller.id })}
               activeOpacity={0.85}>
               <View style={pd.sellerHeader}>
-                <View style={pd.sellerAvatar}>
-                  <Text style={{ fontSize: 22 }}>🏪</Text>
-                </View>
+                {seller.logo_url ? (
+                  <Image
+                    source={{ uri: seller.logo_url }}
+                    style={pd.sellerLogoImg}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={pd.sellerAvatar}>
+                    <Text style={{ fontSize: 22 }}>🏪</Text>
+                  </View>
+                )}
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Text style={pd.sellerName}>{seller.name}</Text>
+                    {(seller.is_verified || seller.verified) && (
+                      <View style={pd.verifiedBadge}>
+                        <Text style={pd.verifiedTxt}>✓</Text>
+                      </View>
+                    )}
                     {isOwner && (
                       <View style={pd.ownerTag}>
                         <Text style={pd.ownerTagTxt}>Tu tienda</Text>
                       </View>
                     )}
                   </View>
-                  <Text style={pd.sellerSub}>Tienda oficial</Text>
+                  <Text style={pd.sellerSub}>
+                    Tienda oficial · {seller.location || 'Lima, Perú'}
+                  </Text>
                 </View>
                 <Text style={{ color: COLORS.gray400, fontSize: 18 }}>›</Text>
               </View>
@@ -442,17 +479,14 @@ export default function ProductDetailScreen({ route, navigation }: any) {
       {/* ── BOTTOM BAR ── */}
       <View style={[pd.bottomBar, { paddingBottom: insets.bottom + 8 }]}>
         {isOwner ? (
-          // ── Vendedor viendo su propio producto ──
           <TouchableOpacity
             style={pd.editBtn}
-            onPress={() => navigation.navigate('SellerDashboard')}
+            onPress={() => navigation.navigate('ProfileTab', { screen: 'SellerDashboard' })}
             activeOpacity={0.85}>
             <Text style={pd.editBtnTxt}>🏪 Ir a mi panel de vendedor</Text>
           </TouchableOpacity>
         ) : (
-          // ── Comprador (logueado o invitado) ──
           <>
-            {/* Contador qty — solo si hay algo en carrito */}
             {inCart && (
               <View style={pd.qtyRow}>
                 <TouchableOpacity
@@ -468,8 +502,6 @@ export default function ProductDetailScreen({ route, navigation }: any) {
                 </TouchableOpacity>
               </View>
             )}
-
-            {/* Comprar ahora — navega al carrito (agrega si no estaba) */}
             <TouchableOpacity
               style={pd.buyNowBtn}
               onPress={() => {
@@ -478,8 +510,6 @@ export default function ProductDetailScreen({ route, navigation }: any) {
               }}>
               <Text style={pd.buyNowTxt}>Comprar ahora</Text>
             </TouchableOpacity>
-
-            {/* Al carrito — SIEMPRE solo agrega, nunca navega */}
             <TouchableOpacity
               style={[pd.cartBtn, addedFeedback && pd.cartBtnFeedback]}
               onPress={handleAddToCart}
@@ -553,6 +583,9 @@ const pd = StyleSheet.create({
   specRow:         { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: SPACING.md, paddingVertical: 10, borderRadius: RADIUS.sm, marginBottom: 4 },
   specKey:         { fontSize: 13, color: COLORS.gray600, fontWeight: FONT.semibold, flex: 1 },
   specVal:         { fontSize: 13, color: COLORS.gray800, fontWeight: FONT.bold, flex: 1, textAlign: 'right' },
+  specsEmpty:      { alignItems: 'center', paddingVertical: 32 },
+  specsEmptyTxt:   { fontSize: 14, fontWeight: FONT.black, color: COLORS.gray800, marginBottom: 6 },
+  specsEmptySub:   { fontSize: 12, color: COLORS.gray400, textAlign: 'center', lineHeight: 18 },
   ratingSum:       { flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: COLORS.gray100, borderRadius: RADIUS.lg, padding: SPACING.md, marginBottom: SPACING.md },
   ratingSumBig:    { fontSize: 40, fontWeight: FONT.black, color: COLORS.gray800 },
   reviewCard:      { backgroundColor: COLORS.gray100, borderRadius: RADIUS.lg, padding: SPACING.md, marginBottom: 10 },
@@ -566,8 +599,11 @@ const pd = StyleSheet.create({
   sellerCard:      { margin: SPACING.lg, backgroundColor: COLORS.gray100, borderRadius: RADIUS.xl, padding: SPACING.lg },
   sellerHeader:    { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: SPACING.md },
   sellerAvatar:    { width: 52, height: 52, backgroundColor: COLORS.primaryLight, borderRadius: RADIUS.lg, alignItems: 'center', justifyContent: 'center' },
+  sellerLogoImg:   { width: 52, height: 52, borderRadius: RADIUS.lg },
   sellerName:      { fontSize: 15, fontWeight: FONT.black, color: COLORS.gray800 },
   sellerSub:       { fontSize: 12, color: COLORS.gray400, marginTop: 2 },
+  verifiedBadge:   { backgroundColor: COLORS.primary, width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  verifiedTxt:     { color: '#fff', fontSize: 9, fontWeight: FONT.black },
   ownerTag:        { backgroundColor: COLORS.amberLight, borderRadius: RADIUS.full, paddingHorizontal: 8, paddingVertical: 3 },
   ownerTagTxt:     { fontSize: 11, color: COLORS.amber, fontWeight: FONT.bold },
   sellerStats:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
