@@ -1,5 +1,5 @@
 // src/screens/SellerAddProductScreen.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ScrollView, ActivityIndicator,
@@ -44,6 +44,30 @@ export default function SellerAddProductScreen({ route, navigation }: any) {
   const [loading,     setLoading]     = useState(false);
   const [errors,      setErrors]      = useState<Record<string, string>>({});
 
+  // ── Verificación de aprobación del vendedor ───────────────────
+  const [checkingApproval, setCheckingApproval] = useState(true);
+  const [sellerStatus,      setSellerStatus]    = useState<string | null>(null);
+
+  useEffect(() => {
+    const checkStatus = async () => {
+      if (!sellerId) { setCheckingApproval(false); return; }
+      try {
+        const { data } = await supabase
+          .from('sellers')
+          .select('status')
+          .eq('id', sellerId)
+          .single();
+        setSellerStatus(data?.status || 'pending');
+      } catch (e) {
+        if (__DEV__) { console.log('[ADD_PRODUCT] Status check error:', e); }
+        setSellerStatus('pending');
+      } finally {
+        setCheckingApproval(false);
+      }
+    };
+    checkStatus();
+  }, [sellerId]);
+
   const validImages = images.filter(img => img && img.trim().length > 0);
 
   // ── Seleccionar imagen ────────────────────────────────────────
@@ -59,7 +83,6 @@ export default function SellerAddProductScreen({ route, navigation }: any) {
             setImages(prev => {
               const next = [...prev];
               next[index] = result.assets![0].uri!;
-              if (__DEV__) { console.log('[IMG] Cámara index', index, '→', next); }
               return next;
             });
             setErrors(e => ({ ...e, images: '' }));
@@ -76,7 +99,6 @@ export default function SellerAddProductScreen({ route, navigation }: any) {
             setImages(prev => {
               const next = [...prev];
               next[index] = result.assets![0].uri!;
-              if (__DEV__) { console.log('[IMG] Galería index', index, '→', next); }
               return next;
             });
             setErrors(e => ({ ...e, images: '' }));
@@ -96,61 +118,48 @@ export default function SellerAddProductScreen({ route, navigation }: any) {
   };
 
   // ── Subir imagen con RNFS ─────────────────────────────────────
-const uploadImage = async (uri: string, index: number): Promise<string | null> => {
-  try {
-    if (__DEV__) { console.log('[UPLOAD] Iniciando con RNFS:', index); }
+  const uploadImage = async (uri: string, index: number): Promise<string | null> => {
+    try {
+      const cleanUri = uri.replace('file://', '');
+      const base64 = await RNFS.readFile(cleanUri, 'base64');
 
-    // Limpiar el URI para RNFS
-    const cleanUri = uri.replace('file://', '');
+      const chars   = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+      const lookup  = new Uint8Array(256);
+      for (let i = 0; i < chars.length; i++) { lookup[chars.charCodeAt(i)] = i; }
 
-    // Leer como base64
-    const base64 = await RNFS.readFile(cleanUri, 'base64');
-    if (__DEV__) { console.log('[UPLOAD] Base64 length:', base64.length); }
+      const b64 = base64.replace(/=/g, '');
+      const len = b64.length;
+      const bytes = new Uint8Array(Math.floor((len * 3) / 4));
+      let j = 0;
 
-    // Decodificar base64 sin atob (no existe en RN)
-    const chars   = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-    const lookup  = new Uint8Array(256);
-    for (let i = 0; i < chars.length; i++) { lookup[chars.charCodeAt(i)] = i; }
+      for (let i = 0; i < len; i += 4) {
+        const a = lookup[b64.charCodeAt(i)];
+        const b = lookup[b64.charCodeAt(i + 1)];
+        const c = lookup[b64.charCodeAt(i + 2)];
+        const d = lookup[b64.charCodeAt(i + 3)];
+        bytes[j++] = (a << 2) | (b >> 4);
+        if (i + 2 < len) { bytes[j++] = ((b & 15) << 4) | (c >> 2); }
+        if (i + 3 < len) { bytes[j++] = ((c & 3) << 6) | d; }
+      }
 
-    const b64 = base64.replace(/=/g, '');
-    const len = b64.length;
-    const bytes = new Uint8Array(Math.floor((len * 3) / 4));
-    let j = 0;
+      const fileName = `product_${sellerId}_${Date.now()}_${index}.jpg`;
+      const { error } = await supabase.storage
+        .from('products')
+        .upload(fileName, bytes, { contentType: 'image/jpeg', upsert: true });
 
-    for (let i = 0; i < len; i += 4) {
-      const a = lookup[b64.charCodeAt(i)];
-      const b = lookup[b64.charCodeAt(i + 1)];
-      const c = lookup[b64.charCodeAt(i + 2)];
-      const d = lookup[b64.charCodeAt(i + 3)];
-      bytes[j++] = (a << 2) | (b >> 4);
-      if (i + 2 < len) { bytes[j++] = ((b & 15) << 4) | (c >> 2); }
-      if (i + 3 < len) { bytes[j++] = ((c & 3) << 6) | d; }
-    }
+      if (error) {
+        if (__DEV__) { console.log('[UPLOAD] Error:', JSON.stringify(error)); }
+        return null;
+      }
 
-    const fileName = `product_${sellerId}_${Date.now()}_${index}.jpg`;
-    if (__DEV__) { console.log('[UPLOAD] bytes:', bytes.length, 'fileName:', fileName); }
+      const { data: urlData } = supabase.storage.from('products').getPublicUrl(fileName);
+      return urlData.publicUrl;
 
-    const { data, error } = await supabase.storage
-      .from('products')
-      .upload(fileName, bytes, { contentType: 'image/jpeg', upsert: true });
-
-    if (error) {
-      if (__DEV__) { console.log('[UPLOAD] Error:', JSON.stringify(error)); }
+    } catch (e) {
+      if (__DEV__) { console.log('[UPLOAD] Exception:', e); }
       return null;
     }
-
-    const { data: urlData } = supabase.storage
-      .from('products')
-      .getPublicUrl(fileName);
-
-    if (__DEV__) { console.log('[UPLOAD] URL:', urlData.publicUrl); }
-    return urlData.publicUrl;
-
-  } catch (e) {
-    if (__DEV__) { console.log('[UPLOAD] Exception:', e); }
-    return null;
-  }
-};
+  };
 
   // ── Specs ─────────────────────────────────────────────────────
   const addSpec    = () => setSpecs(prev => [...prev, '']);
@@ -172,7 +181,6 @@ const uploadImage = async (uri: string, index: number): Promise<string | null> =
     }
     if (!category) { errs.category = 'Selecciona una categoría'; }
 
-    // Solo validar imágenes nuevas (no URLs de Supabase existentes)
     const newImages = validImages.filter(img => img.startsWith('file://') || img.startsWith('/'));
     const existingImages = validImages.filter(img => img.startsWith('http'));
 
@@ -180,16 +188,12 @@ const uploadImage = async (uri: string, index: number): Promise<string | null> =
       errs.images = 'Agrega al menos una foto';
     }
 
-    if (__DEV__) { console.log('[VALIDATE] validImages:', validImages.length, 'new:', newImages.length, 'existing:', existingImages.length); }
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
   // ── Guardar producto ──────────────────────────────────────────
   const handleSave = async () => {
-    if (__DEV__) { console.log('[SAVE] images:', images); }
-    if (__DEV__) { console.log('[SAVE] validImages:', validImages); }
-
     if (!validate()) {
       Alert.alert('Faltan datos', 'Por favor completa todos los campos requeridos.');
       return;
@@ -197,26 +201,18 @@ const uploadImage = async (uri: string, index: number): Promise<string | null> =
     setLoading(true);
 
     try {
-      // 1. Procesar imágenes — subir las nuevas, mantener las existentes
       const imageUrls: string[] = [];
 
       for (let i = 0; i < validImages.length; i++) {
         const img = validImages[i];
         if (img.startsWith('http')) {
-          // Ya es una URL de Supabase — mantener
           imageUrls.push(img);
-          if (__DEV__) { console.log('[SAVE] Manteniendo URL existente:', img.substring(0, 50)); }
         } else {
-          // Es un archivo local — subir
-          if (__DEV__) { console.log('[SAVE] Subiendo imagen nueva:', i, img.substring(0, 50)); }
           const url = await uploadImage(img, i);
           if (url) { imageUrls.push(url); }
         }
       }
 
-      if (__DEV__) { console.log('[SAVE] imageUrls finales:', imageUrls); }
-
-      // 2. Preparar datos
       const productData = {
         seller_id:    sellerId,
         category_id:  category,
@@ -253,7 +249,6 @@ const uploadImage = async (uri: string, index: number): Promise<string | null> =
         savedProduct = data;
       }
 
-      // 3. Specs
       if (savedProduct && specs.filter(s => s.trim()).length > 0) {
         if (isEditing) {
           await supabase.from('product_specs').delete().eq('product_id', savedProduct.id);
@@ -286,6 +281,60 @@ const uploadImage = async (uri: string, index: number): Promise<string | null> =
     }
   };
 
+  // ── Cargando verificación ─────────────────────────────────────
+  if (checkingApproval) {
+    return (
+      <View style={[ap.container, { paddingTop: insets.top }]}>
+        <View style={ap.header}>
+          <TouchableOpacity style={ap.backBtn} onPress={() => navigation.goBack()}>
+            <Text style={ap.backTxt}>‹</Text>
+          </TouchableOpacity>
+          <Text style={ap.headerTitle}>Nuevo producto</Text>
+          <View style={{ width: 36 }} />
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
+      </View>
+    );
+  }
+
+  // ── Bloqueado — vendedor no aprobado ──────────────────────────
+  if (sellerStatus !== 'approved') {
+    return (
+      <View style={[ap.container, { paddingTop: insets.top }]}>
+        <View style={ap.header}>
+          <TouchableOpacity style={ap.backBtn} onPress={() => navigation.goBack()}>
+            <Text style={ap.backTxt}>‹</Text>
+          </TouchableOpacity>
+          <Text style={ap.headerTitle}>Nuevo producto</Text>
+          <View style={{ width: 36 }} />
+        </View>
+        <View style={ap.blockedWrap}>
+          <Text style={{ fontSize: 56, marginBottom: 16 }}>
+            {sellerStatus === 'rejected' ? '❌' : '⏳'}
+          </Text>
+          <Text style={ap.blockedTitle}>
+            {sellerStatus === 'rejected'
+              ? 'Tu tienda no fue aprobada'
+              : 'Tu tienda está en revisión'}
+          </Text>
+          <Text style={ap.blockedSub}>
+            {sellerStatus === 'rejected'
+              ? 'Corrige la información de tu tienda para volver a solicitar la aprobación.'
+              : 'Podrás publicar productos una vez que tu tienda sea aprobada por nuestro equipo (24-48 horas).'}
+          </Text>
+          <TouchableOpacity
+            style={ap.blockedBtn}
+            onPress={() => navigation.goBack()}>
+            <Text style={ap.blockedBtnTxt}>Volver a mi tienda</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // ── Formulario normal ─────────────────────────────────────────
   return (
     <View style={[ap.container, { paddingTop: insets.top }]}>
       <View style={ap.header}>
@@ -547,4 +596,9 @@ const ap = StyleSheet.create({
   addSpecBtnTxt:   { fontSize: 13, color: COLORS.primary, fontWeight: FONT.bold },
   saveBtn:         { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: 15, alignItems: 'center', ...SHADOW.strong },
   saveBtnTxt:      { color: COLORS.white, fontSize: 15, fontWeight: FONT.black },
+  blockedWrap:     { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.lg },
+  blockedTitle:    { fontSize: 18, fontWeight: FONT.black, color: COLORS.gray800, textAlign: 'center', marginBottom: 10 },
+  blockedSub:      { fontSize: 13, color: COLORS.gray400, textAlign: 'center', lineHeight: 20, marginBottom: 24, paddingHorizontal: 10 },
+  blockedBtn:      { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: 14, paddingHorizontal: 32, ...SHADOW.strong },
+  blockedBtnTxt:   { color: '#fff', fontSize: 14, fontWeight: FONT.black },
 });

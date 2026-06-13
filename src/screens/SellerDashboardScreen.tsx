@@ -55,6 +55,13 @@ export default function SellerDashboardScreen({ navigation }: any) {
       setSeller(sellerData);
       if (!sellerData) { setLoading(false); return; }
 
+      // ── Si no está aprobado, no calcular stats todavía ────────
+      if (sellerData.status !== 'approved') {
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
       const { data: products } = await supabase
         .from('products')
         .select('id, is_active, sold, rating, review_count, price')
@@ -101,6 +108,7 @@ export default function SellerDashboardScreen({ navigation }: any) {
   useEffect(() => { fetchData(); }, [fetchData]);
   const onRefresh = () => { setRefreshing(true); fetchData(); };
 
+  // ── Sin sesión ────────────────────────────────────────────────
   if (!user) {
     return (
       <View style={[sd.container, { paddingTop: insets.top }]}>
@@ -122,6 +130,7 @@ export default function SellerDashboardScreen({ navigation }: any) {
     );
   }
 
+  // ── Sin tienda ────────────────────────────────────────────────
   if (!loading && !seller) {
     return (
       <View style={[sd.container, { paddingTop: insets.top }]}>
@@ -144,6 +153,127 @@ export default function SellerDashboardScreen({ navigation }: any) {
     );
   }
 
+  // ── Loading ───────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <View style={[sd.container, { paddingTop: insets.top }]}>
+        <View style={sd.header}>
+          <TouchableOpacity style={sd.backBtn} onPress={() => navigation.goBack()}>
+            <Text style={sd.backTxt}>‹</Text>
+          </TouchableOpacity>
+          <Text style={sd.headerTitle}>Mi Tienda</Text>
+          <View style={{ width: 36 }} />
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
+      </View>
+    );
+  }
+
+  // ── PENDIENTE DE REVISIÓN ─────────────────────────────────────
+  if (seller.status === 'pending') {
+    return (
+      <View style={[sd.container, { paddingTop: insets.top }]}>
+        <View style={sd.header}>
+          <TouchableOpacity style={sd.backBtn} onPress={() => navigation.goBack()}>
+            <Text style={sd.backTxt}>‹</Text>
+          </TouchableOpacity>
+          <Text style={sd.headerTitle}>Mi Tienda</Text>
+          <View style={{ width: 36 }} />
+        </View>
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
+          }>
+          <View style={sd.statusWrap}>
+            <Text style={{ fontSize: 64, marginBottom: 16 }}>⏳</Text>
+            <Text style={sd.statusTitle}>Tu tienda está en revisión</Text>
+            <Text style={sd.statusSub}>
+              Estamos verificando la información de "{seller.name}". Este proceso toma entre
+              24 y 48 horas. Te avisaremos cuando esté aprobada.
+            </Text>
+
+            <View style={sd.statusCard}>
+              {seller.logo_url ? (
+                <Image source={{ uri: seller.logo_url }} style={sd.statusLogoImg} resizeMode="cover" />
+              ) : (
+                <View style={sd.storeAvatar}>
+                  <Text style={{ fontSize: 28 }}>🏪</Text>
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={sd.statusCardName}>{seller.name}</Text>
+                <Text style={sd.statusCardSub}>📍 {seller.location || 'Lima, Perú'}</Text>
+                <View style={sd.statusBadgePending}>
+                  <Text style={sd.statusBadgeTxt}>⏳ Pendiente de aprobación</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={sd.statusInfoCard}>
+              <Text style={sd.statusInfoTxt}>
+                Mientras tanto puedes editar la información de tu tienda, pero tus productos
+                no serán visibles hasta la aprobación.
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={sd.statusEditBtn}
+              onPress={() => navigation.navigate('SellerEditStore', { seller })}>
+              <Text style={sd.statusEditBtnTxt}>⚙️ Editar información de mi tienda</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ── RECHAZADO ─────────────────────────────────────────────────
+  if (seller.status === 'rejected') {
+    return (
+      <View style={[sd.container, { paddingTop: insets.top }]}>
+        <View style={sd.header}>
+          <TouchableOpacity style={sd.backBtn} onPress={() => navigation.goBack()}>
+            <Text style={sd.backTxt}>‹</Text>
+          </TouchableOpacity>
+          <Text style={sd.headerTitle}>Mi Tienda</Text>
+          <View style={{ width: 36 }} />
+        </View>
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
+          }>
+          <View style={sd.statusWrap}>
+            <Text style={{ fontSize: 64, marginBottom: 16 }}>❌</Text>
+            <Text style={[sd.statusTitle, { color: COLORS.red }]}>
+              Tu solicitud no fue aprobada
+            </Text>
+            <Text style={sd.statusSub}>
+              Revisa el motivo y corrige la información para volver a intentarlo.
+            </Text>
+
+            {seller.rejection_reason && (
+              <View style={sd.rejectionCard}>
+                <Text style={sd.rejectionTitle}>Motivo del rechazo:</Text>
+                <Text style={sd.rejectionTxt}>{seller.rejection_reason}</Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={sd.statusEditBtn}
+              onPress={() => navigation.navigate('SellerEditStore', { seller })}>
+              <Text style={sd.statusEditBtnTxt}>⚙️ Editar y corregir información</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ── APROBADO — DASHBOARD NORMAL ───────────────────────────────
   return (
     <View style={[sd.container, { paddingTop: insets.top }]}>
 
@@ -160,192 +290,182 @@ export default function SellerDashboardScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      {loading ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-        </View>
-      ) : (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 100 }}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
-          }>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
+        }>
 
-          {/* ── PERFIL TIENDA ── */}
-          <View style={sd.storeCard}>
-            {seller?.logo_url ? (
-              <Image
-                source={{ uri: seller.logo_url }}
-                style={sd.storeLogoImg}
-                resizeMode="cover"
-              />
-            ) : (
-              <View style={sd.storeAvatar}>
-                <Text style={{ fontSize: 36 }}>🏪</Text>
-              </View>
-            )}
-            <View style={{ flex: 1 }}>
-              <View style={sd.storeNameRow}>
-                <Text style={sd.storeName}>{seller?.name || 'Mi Tienda'}</Text>
-                {seller?.is_verified && (
-                  <View style={sd.verifiedBadge}>
-                    <Text style={sd.verifiedTxt}>✓</Text>
-                  </View>
-                )}
-                {seller?.is_premium && (
-                  <View style={sd.premiumBadge}>
-                    <Text style={sd.premiumTxt}>PREMIUM</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={sd.storeLocation}>📍 {seller?.location || 'Lima, Perú'}</Text>
-              {seller?.description && (
-                <Text style={sd.storeDesc} numberOfLines={2}>{seller.description}</Text>
-              )}
-            </View>
-          </View>
-
-          {/* ── ACCIONES RÁPIDAS ── */}
-          <View style={sd.actionsRow}>
-            <TouchableOpacity
-              style={sd.actionBtn}
-              onPress={() => navigation.navigate('SellerProducts', { sellerId: seller.id })}
-              activeOpacity={0.85}>
-              <Text style={{ fontSize: 28, marginBottom: 6 }}>📦</Text>
-              <Text style={sd.actionLabel}>Mis productos</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={sd.actionBtn}
-              onPress={() => navigation.navigate('SellerAddProduct', { sellerId: seller.id })}
-              activeOpacity={0.85}>
-              <Text style={{ fontSize: 28, marginBottom: 6 }}>➕</Text>
-              <Text style={sd.actionLabel}>Agregar producto</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={sd.actionBtn}
-              onPress={() => navigation.navigate('SellerOrders', { sellerId: seller.id })}
-              activeOpacity={0.85}>
-              <Text style={{ fontSize: 28, marginBottom: 6 }}>🛍️</Text>
-              <Text style={sd.actionLabel}>Mis ventas</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={sd.actionBtn}
-              onPress={() => navigation.navigate('SellerReviews', { sellerId: seller.id })}
-              activeOpacity={0.85}>
-              <Text style={{ fontSize: 28, marginBottom: 6 }}>⭐</Text>
-              <Text style={sd.actionLabel}>Reseñas</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* ── ESTADÍSTICAS ── */}
-          {stats && (
-            <View style={sd.section}>
-              <Text style={sd.sectionTitle}>📊 Resumen</Text>
-              <View style={sd.statsGrid}>
-                <View style={sd.statCard}>
-                  <Text style={sd.statVal}>{stats.totalProducts}</Text>
-                  <Text style={sd.statLbl}>Productos</Text>
-                </View>
-                <View style={sd.statCard}>
-                  <Text style={[sd.statVal, { color: COLORS.green }]}>{stats.activeProducts}</Text>
-                  <Text style={sd.statLbl}>Activos</Text>
-                </View>
-                <View style={sd.statCard}>
-                  <Text style={sd.statVal}>{stats.totalSales}</Text>
-                  <Text style={sd.statLbl}>Vendidos</Text>
-                </View>
-                <View style={sd.statCard}>
-                  <Text style={[sd.statVal, { fontSize: 14 }]}>
-                    S/ {stats.totalRevenue.toLocaleString()}
-                  </Text>
-                  <Text style={sd.statLbl}>Ingresos</Text>
-                </View>
-                <View style={sd.statCard}>
-                  <Text style={sd.statVal}>⭐ {stats.avgRating.toFixed(1)}</Text>
-                  <Text style={sd.statLbl}>Rating</Text>
-                </View>
-                <View style={sd.statCard}>
-                  <Text style={sd.statVal}>{stats.totalReviews}</Text>
-                  <Text style={sd.statLbl}>Reseñas</Text>
-                </View>
-              </View>
+        {/* ── PERFIL TIENDA ── */}
+        <View style={sd.storeCard}>
+          {seller?.logo_url ? (
+            <Image source={{ uri: seller.logo_url }} style={sd.storeLogoImg} resizeMode="cover" />
+          ) : (
+            <View style={sd.storeAvatar}>
+              <Text style={{ fontSize: 36 }}>🏪</Text>
             </View>
           )}
-
-          {/* ── PEDIDOS RECIENTES ── */}
-          <View style={sd.section}>
-            <View style={sd.sectionHeader}>
-              <Text style={sd.sectionTitle}>🛍️ Ventas recientes</Text>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('SellerOrders', { sellerId: seller?.id })}>
-                <Text style={sd.sectionLink}>Ver todas ›</Text>
-              </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <View style={sd.storeNameRow}>
+              <Text style={sd.storeName}>{seller?.name || 'Mi Tienda'}</Text>
+              {seller?.is_verified && (
+                <View style={sd.verifiedBadge}>
+                  <Text style={sd.verifiedTxt}>✓</Text>
+                </View>
+              )}
+              {seller?.is_premium && (
+                <View style={sd.premiumBadge}>
+                  <Text style={sd.premiumTxt}>PREMIUM</Text>
+                </View>
+              )}
             </View>
-
-            {orders.length === 0 ? (
-              <View style={sd.emptyOrders}>
-                <Text style={{ fontSize: 32, marginBottom: 8 }}>📭</Text>
-                <Text style={sd.emptyOrdersTxt}>Aún no tienes ventas</Text>
-                <Text style={sd.emptyOrdersSub}>
-                  Cuando alguien compre tus productos aparecerán aquí
-                </Text>
-              </View>
-            ) : (
-              orders.slice(0, 3).map(order => (
-                <TouchableOpacity
-                  key={order.id}
-                  style={sd.orderCard}
-                  onPress={() => navigation.navigate('SellerOrders', { sellerId: seller?.id })}
-                  activeOpacity={0.85}>
-                  <View style={sd.orderLeft}>
-                    <Text style={sd.orderBuyer}>{order.buyer_name || 'Cliente'}</Text>
-                    <Text style={sd.orderEmail}>{order.buyer_email}</Text>
-                    <Text style={sd.orderDate}>
-                      {new Date(order.created_at).toLocaleDateString('es-PE')}
-                    </Text>
-                  </View>
-                  <View style={sd.orderRight}>
-                    <Text style={sd.orderTotal}>S/ {order.total}</Text>
-                    <View style={[sd.orderStatus, {
-                      backgroundColor:
-                        order.status === 'delivered' ? COLORS.greenLight :
-                        order.status === 'shipped'   ? COLORS.blueLight  :
-                        order.status === 'cancelled' ? '#FFE5E5'          :
-                        COLORS.amberLight,
-                    }]}>
-                      <Text style={[sd.orderStatusTxt, {
-                        color:
-                          order.status === 'delivered' ? COLORS.green :
-                          order.status === 'shipped'   ? COLORS.blue  :
-                          order.status === 'cancelled' ? COLORS.red   :
-                          COLORS.amber,
-                      }]}>
-                        {order.status === 'processing' ? 'Procesando' :
-                         order.status === 'delivered'  ? 'Entregado'  :
-                         order.status === 'shipped'    ? 'En camino'  :
-                         order.status === 'cancelled'  ? 'Cancelado'  : order.status}
-                      </Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              ))
+            <Text style={sd.storeLocation}>📍 {seller?.location || 'Lima, Perú'}</Text>
+            {seller?.description && (
+              <Text style={sd.storeDesc} numberOfLines={2}>{seller.description}</Text>
             )}
           </View>
+        </View>
 
-          {/* ── TIP ── */}
-          <View style={sd.tipCard}>
-            <Text style={sd.tipIcon}>💡</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={sd.tipTitle}>Consejos para vender más</Text>
-              <Text style={sd.tipTxt}>
-                Sube fotos de calidad, describe bien tus productos y responde rápido a tus clientes.
-              </Text>
+        {/* ── ACCIONES RÁPIDAS ── */}
+        <View style={sd.actionsRow}>
+          <TouchableOpacity
+            style={sd.actionBtn}
+            onPress={() => navigation.navigate('SellerProducts', { sellerId: seller.id })}
+            activeOpacity={0.85}>
+            <Text style={{ fontSize: 28, marginBottom: 6 }}>📦</Text>
+            <Text style={sd.actionLabel}>Mis productos</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={sd.actionBtn}
+            onPress={() => navigation.navigate('SellerAddProduct', { sellerId: seller.id })}
+            activeOpacity={0.85}>
+            <Text style={{ fontSize: 28, marginBottom: 6 }}>➕</Text>
+            <Text style={sd.actionLabel}>Agregar producto</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={sd.actionBtn}
+            onPress={() => navigation.navigate('SellerOrders', { sellerId: seller.id })}
+            activeOpacity={0.85}>
+            <Text style={{ fontSize: 28, marginBottom: 6 }}>🛍️</Text>
+            <Text style={sd.actionLabel}>Mis ventas</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={sd.actionBtn}
+            onPress={() => navigation.navigate('SellerReviews', { sellerId: seller.id })}
+            activeOpacity={0.85}>
+            <Text style={{ fontSize: 28, marginBottom: 6 }}>⭐</Text>
+            <Text style={sd.actionLabel}>Reseñas</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── ESTADÍSTICAS ── */}
+        {stats && (
+          <View style={sd.section}>
+            <Text style={sd.sectionTitle}>📊 Resumen</Text>
+            <View style={sd.statsGrid}>
+              <View style={sd.statCard}>
+                <Text style={sd.statVal}>{stats.totalProducts}</Text>
+                <Text style={sd.statLbl}>Productos</Text>
+              </View>
+              <View style={sd.statCard}>
+                <Text style={[sd.statVal, { color: COLORS.green }]}>{stats.activeProducts}</Text>
+                <Text style={sd.statLbl}>Activos</Text>
+              </View>
+              <View style={sd.statCard}>
+                <Text style={sd.statVal}>{stats.totalSales}</Text>
+                <Text style={sd.statLbl}>Vendidos</Text>
+              </View>
+              <View style={sd.statCard}>
+                <Text style={[sd.statVal, { fontSize: 14 }]}>
+                  S/ {stats.totalRevenue.toLocaleString()}
+                </Text>
+                <Text style={sd.statLbl}>Ingresos</Text>
+              </View>
+              <View style={sd.statCard}>
+                <Text style={sd.statVal}>⭐ {stats.avgRating.toFixed(1)}</Text>
+                <Text style={sd.statLbl}>Rating</Text>
+              </View>
+              <View style={sd.statCard}>
+                <Text style={sd.statVal}>{stats.totalReviews}</Text>
+                <Text style={sd.statLbl}>Reseñas</Text>
+              </View>
             </View>
           </View>
+        )}
 
-        </ScrollView>
-      )}
+        {/* ── PEDIDOS RECIENTES ── */}
+        <View style={sd.section}>
+          <View style={sd.sectionHeader}>
+            <Text style={sd.sectionTitle}>🛍️ Ventas recientes</Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('SellerOrders', { sellerId: seller?.id })}>
+              <Text style={sd.sectionLink}>Ver todas ›</Text>
+            </TouchableOpacity>
+          </View>
+
+          {orders.length === 0 ? (
+            <View style={sd.emptyOrders}>
+              <Text style={{ fontSize: 32, marginBottom: 8 }}>📭</Text>
+              <Text style={sd.emptyOrdersTxt}>Aún no tienes ventas</Text>
+              <Text style={sd.emptyOrdersSub}>
+                Cuando alguien compre tus productos aparecerán aquí
+              </Text>
+            </View>
+          ) : (
+            orders.slice(0, 3).map(order => (
+              <TouchableOpacity
+                key={order.id}
+                style={sd.orderCard}
+                onPress={() => navigation.navigate('SellerOrders', { sellerId: seller?.id })}
+                activeOpacity={0.85}>
+                <View style={sd.orderLeft}>
+                  <Text style={sd.orderBuyer}>{order.buyer_name || 'Cliente'}</Text>
+                  <Text style={sd.orderEmail}>{order.buyer_email}</Text>
+                  <Text style={sd.orderDate}>
+                    {new Date(order.created_at).toLocaleDateString('es-PE')}
+                  </Text>
+                </View>
+                <View style={sd.orderRight}>
+                  <Text style={sd.orderTotal}>S/ {order.total}</Text>
+                  <View style={[sd.orderStatus, {
+                    backgroundColor:
+                      order.status === 'delivered' ? COLORS.greenLight :
+                      order.status === 'shipped'   ? COLORS.blueLight  :
+                      order.status === 'cancelled' ? '#FFE5E5'          :
+                      COLORS.amberLight,
+                  }]}>
+                    <Text style={[sd.orderStatusTxt, {
+                      color:
+                        order.status === 'delivered' ? COLORS.green :
+                        order.status === 'shipped'   ? COLORS.blue  :
+                        order.status === 'cancelled' ? COLORS.red   :
+                        COLORS.amber,
+                    }]}>
+                      {order.status === 'processing' ? 'Procesando' :
+                       order.status === 'delivered'  ? 'Entregado'  :
+                       order.status === 'shipped'    ? 'En camino'  :
+                       order.status === 'cancelled'  ? 'Cancelado'  : order.status}
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
+
+        {/* ── TIP ── */}
+        <View style={sd.tipCard}>
+          <Text style={sd.tipIcon}>💡</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={sd.tipTitle}>Consejos para vender más</Text>
+            <Text style={sd.tipTxt}>
+              Sube fotos de calidad, describe bien tus productos y responde rápido a tus clientes.
+            </Text>
+          </View>
+        </View>
+
+      </ScrollView>
 
       {/* ── FAB ── */}
       <TouchableOpacity
@@ -411,4 +531,21 @@ const sd = StyleSheet.create({
   tipTxt:          { fontSize: 12, color: COLORS.primary, lineHeight: 18 },
   fab:             { position: 'absolute', right: SPACING.lg, backgroundColor: COLORS.primary, borderRadius: RADIUS.full, paddingHorizontal: 20, paddingVertical: 14, ...SHADOW.strong },
   fabTxt:          { color: COLORS.white, fontWeight: FONT.black, fontSize: 14 },
+  // ── ESTADOS PENDING/REJECTED ──
+  statusWrap:      { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.lg, paddingTop: 40 },
+  statusTitle:     { fontSize: 19, fontWeight: FONT.black, color: COLORS.gray800, textAlign: 'center', marginBottom: 10 },
+  statusSub:       { fontSize: 13, color: COLORS.gray400, textAlign: 'center', lineHeight: 20, marginBottom: 24, paddingHorizontal: 10 },
+  statusCard:      { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: COLORS.white, borderRadius: RADIUS.xl, padding: SPACING.lg, width: '100%', borderWidth: 0.5, borderColor: COLORS.border, marginBottom: SPACING.md, ...SHADOW.card },
+  statusLogoImg:   { width: 52, height: 52, borderRadius: RADIUS.lg },
+  statusCardName:  { fontSize: 15, fontWeight: FONT.black, color: COLORS.gray800, marginBottom: 2 },
+  statusCardSub:   { fontSize: 12, color: COLORS.gray400, marginBottom: 6 },
+  statusBadgePending: { backgroundColor: COLORS.amberLight, borderRadius: RADIUS.full, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start' },
+  statusBadgeTxt:  { fontSize: 11, color: COLORS.amber, fontWeight: FONT.bold },
+  statusInfoCard:  { backgroundColor: COLORS.blueLight, borderRadius: RADIUS.lg, padding: SPACING.md, width: '100%', marginBottom: SPACING.lg },
+  statusInfoTxt:   { fontSize: 12, color: COLORS.blue, lineHeight: 18 },
+  statusEditBtn:   { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: 14, paddingHorizontal: 24, width: '100%', alignItems: 'center', ...SHADOW.strong },
+  statusEditBtnTxt:{ color: '#fff', fontSize: 14, fontWeight: FONT.black },
+  rejectionCard:   { backgroundColor: '#FFF5F5', borderRadius: RADIUS.lg, padding: SPACING.lg, width: '100%', marginBottom: SPACING.lg, borderWidth: 1, borderColor: '#FFD0D0' },
+  rejectionTitle:  { fontSize: 13, fontWeight: FONT.black, color: COLORS.red, marginBottom: 6 },
+  rejectionTxt:    { fontSize: 13, color: COLORS.gray600, lineHeight: 20 },
 });
