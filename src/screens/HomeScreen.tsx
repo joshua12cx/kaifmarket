@@ -6,8 +6,14 @@ import {
   Dimensions, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  Bell, ShoppingCart, MapPin, Search as SearchIcon, X, Camera,
+  ShoppingBag, Gift, Percent, Sparkles, Star, Check,
+  TrendingUp, Tag, ChevronRight,
+} from 'lucide-react-native';
 import { COLORS, SPACING, RADIUS, FONT, SHADOW } from '../theme';
 import { CATEGORIES, Product, PRODUCTS } from '../data';
+import { getCategoryIcon } from '../utils/categoryIcons';
 import ProductCard from '../components/ProductCard';
 import { useCart, useNotifs } from '../context';
 import { supabase } from '../lib/supabase';
@@ -15,9 +21,9 @@ import { supabase } from '../lib/supabase';
 const { width } = Dimensions.get('window');
 
 const BANNERS = [
-  { id: 1, title: 'Semana de\nlanzamiento 🇵🇪', sub: 'Envíos gratis en Lima', emoji: '🎁', bg: '#E8420A', accent: '#FFB830' },
-  { id: 2, title: '20% OFF\nElectrónica',        sub: 'Solo hasta el domingo', emoji: '📱', bg: '#1A1A1A', accent: '#FF6B35' },
-  { id: 3, title: 'Kaif Plus',                   sub: '2% cashback en todo',   emoji: '✦',  bg: '#B5300A', accent: '#FFB830' },
+  { id: 1, title: 'Semana de\nlanzamiento',  sub: 'Envíos gratis en Lima', icon: Gift,    bg: COLORS.primary,     accent: COLORS.gold },
+  { id: 2, title: '20% OFF\nElectrónica',     sub: 'Solo hasta el domingo', icon: Percent, bg: COLORS.blackSoft,  accent: COLORS.primaryMid },
+  { id: 3, title: 'Kaif Plus',                sub: '2% cashback en todo',   icon: Sparkles, bg: COLORS.primaryDark, accent: COLORS.gold },
 ];
 
 export default function HomeScreen({ navigation }: any) {
@@ -41,7 +47,6 @@ export default function HomeScreen({ navigation }: any) {
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Query a Supabase
       let query = supabase
         .from('products')
         .select('*')
@@ -62,7 +67,6 @@ export default function HomeScreen({ navigation }: any) {
         console.log('[HOME] Supabase products:', supabaseProducts?.length, error);
       }
 
-      // 2. Productos estáticos filtrados
       let staticProducts = PRODUCTS as any[];
       if (activeCat !== 'todos') {
         staticProducts = staticProducts.filter(p => p.category === activeCat);
@@ -75,7 +79,6 @@ export default function HomeScreen({ navigation }: any) {
         );
       }
 
-      // 3. Combinar — Supabase primero, luego estáticos
       const combined = [
         ...(supabaseProducts || []),
         ...staticProducts,
@@ -102,32 +105,30 @@ export default function HomeScreen({ navigation }: any) {
     return () => clearInterval(t);
   }, [bannerIdx]);
 
-  // ── Navegar a detalle ─────────────────────────────────────────
   const goToDetail = (product: any) => {
-    // Si es de Supabase tiene string id, si es estático tiene número
     navigation.navigate('ProductDetail', { productId: product.id });
   };
 
   return (
     <View style={[s.container, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.gray800} />
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
 
       {/* ── TOP BAR ── */}
       <View style={s.topBar}>
         <View style={s.logoWrap}>
           <View style={s.logoIcon}>
-            <Text style={{ fontSize: 20 }}>🐦</Text>
+            <ShoppingBag size={20} color={COLORS.primary} strokeWidth={2} />
           </View>
           <View>
             <Text style={s.logoText}>KaifMarket</Text>
-            <Text style={s.logoSub}>Tu marketplace peruano 🇵🇪</Text>
+            <Text style={s.logoSub}>Tu marketplace peruano</Text>
           </View>
         </View>
         <View style={s.topIcons}>
           <TouchableOpacity
             style={s.topIconBtn}
             onPress={() => navigation.navigate('Notifications')}>
-            <Text style={{ fontSize: 18 }}>🔔</Text>
+            <Bell size={18} color={COLORS.white} strokeWidth={2} />
             {unreadCount > 0 && (
               <View style={s.badge}><Text style={s.badgeTxt}>{unreadCount}</Text></View>
             )}
@@ -135,7 +136,7 @@ export default function HomeScreen({ navigation }: any) {
           <TouchableOpacity
             style={s.topIconBtn}
             onPress={() => navigation.navigate('Cart')}>
-            <Text style={{ fontSize: 18 }}>🛒</Text>
+            <ShoppingCart size={18} color={COLORS.white} strokeWidth={2} />
             {totalItems > 0 && (
               <View style={s.badge}><Text style={s.badgeTxt}>{totalItems}</Text></View>
             )}
@@ -146,11 +147,11 @@ export default function HomeScreen({ navigation }: any) {
       {/* ── BUSCADOR ── */}
       <View style={s.searchWrap}>
         <TouchableOpacity style={s.locationRow}>
-          <Text style={{ fontSize: 13 }}>📍</Text>
+          <MapPin size={13} color="rgba(255,255,255,0.85)" strokeWidth={2} />
           <Text style={s.locationTxt}>Miraflores, Lima ▾</Text>
         </TouchableOpacity>
         <View style={s.searchBar}>
-          <Text style={{ fontSize: 15, color: COLORS.gray400 }}>🔍</Text>
+          <SearchIcon size={16} color={COLORS.gray400} strokeWidth={2} />
           <TextInput
             style={s.searchInput}
             placeholder="Buscar en Kaif Market..."
@@ -161,11 +162,11 @@ export default function HomeScreen({ navigation }: any) {
           />
           {search.length > 0 && (
             <TouchableOpacity onPress={() => setSearch('')}>
-              <Text style={{ color: COLORS.gray400, fontSize: 16 }}>✕</Text>
+              <X size={16} color={COLORS.gray400} strokeWidth={2} />
             </TouchableOpacity>
           )}
           <View style={s.searchDiv} />
-          <Text style={{ fontSize: 17 }}>📷</Text>
+          <Camera size={17} color={COLORS.gray400} strokeWidth={2} />
         </View>
       </View>
 
@@ -174,20 +175,24 @@ export default function HomeScreen({ navigation }: any) {
         {/* ── CATEGORÍAS ── */}
         <View style={s.catsWrap}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.cats}>
-            {CATEGORIES.map(cat => (
-              <TouchableOpacity
-                key={cat.id}
-                style={[s.cat, activeCat === cat.id && s.catActive]}
-                onPress={() => setActiveCat(cat.id)}
-                activeOpacity={0.8}>
-                <View style={[s.catIcon, activeCat === cat.id && s.catIconActive]}>
-                  <Text style={{ fontSize: 22 }}>{cat.emoji}</Text>
-                </View>
-                <Text style={[s.catTxt, activeCat === cat.id && s.catTxtActive]}>
-                  {cat.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {CATEGORIES.map(cat => {
+              const Icon = getCategoryIcon(cat.id);
+              const active = activeCat === cat.id;
+              return (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[s.cat, active && s.catActive]}
+                  onPress={() => setActiveCat(cat.id)}
+                  activeOpacity={0.8}>
+                  <View style={[s.catIcon, active && s.catIconActive]}>
+                    <Icon size={22} color={active ? COLORS.primary : COLORS.gray600} strokeWidth={1.8} />
+                  </View>
+                  <Text style={[s.catTxt, active && s.catTxtActive]}>
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
 
@@ -206,15 +211,20 @@ export default function HomeScreen({ navigation }: any) {
                   setBannerIdx(idx);
                 }}
                 keyExtractor={item => String(item.id)}
-                renderItem={({ item }) => (
-                  <View style={[s.banner, { backgroundColor: item.bg }]}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.bannerTitle}>{item.title}</Text>
-                      <Text style={[s.bannerSub, { color: item.accent }]}>{item.sub}</Text>
+                renderItem={({ item }) => {
+                  const Icon = item.icon;
+                  return (
+                    <View style={[s.banner, { backgroundColor: item.bg }]}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.bannerTitle}>{item.title}</Text>
+                        <Text style={[s.bannerSub, { color: item.accent }]}>{item.sub}</Text>
+                      </View>
+                      <View style={s.bannerIconWrap}>
+                        <Icon size={36} color={item.accent} strokeWidth={1.8} />
+                      </View>
                     </View>
-                    <Text style={s.bannerEmoji}>{item.emoji}</Text>
-                  </View>
-                )}
+                  );
+                }}
               />
               <View style={s.bannerDots}>
                 {BANNERS.map((_, i) => (
@@ -237,42 +247,51 @@ export default function HomeScreen({ navigation }: any) {
                   <Text style={s.plusSub}>Cashback · Cuotas sin interés · Envío rápido</Text>
                 </View>
               </View>
-              <Text style={s.plusArrow}>›</Text>
+              <ChevronRight size={20} color={COLORS.primary} strokeWidth={2.5} />
             </TouchableOpacity>
 
             {/* ── SECCIONES HORIZONTALES (data estática) ── */}
             {[
-              { title: '🔥 Más vendidos',   data: featuredProducts },
-              { title: '✨ Nuevos ingresos', data: newProducts      },
-              { title: '🏷️ Mejores ofertas', data: saleProducts     },
-            ].map(sec => (
-              <View key={sec.title} style={s.section}>
-                <View style={s.secHeader}>
-                  <Text style={s.secTitle}>{sec.title}</Text>
-                  <TouchableOpacity>
-                    <Text style={s.secLink}>Ver todo ›</Text>
-                  </TouchableOpacity>
+              { title: 'Más vendidos',    icon: TrendingUp, data: featuredProducts },
+              { title: 'Nuevos ingresos', icon: Sparkles,   data: newProducts      },
+              { title: 'Mejores ofertas', icon: Tag,        data: saleProducts     },
+            ].map(sec => {
+              const SecIcon = sec.icon;
+              return (
+                <View key={sec.title} style={s.section}>
+                  <View style={s.secHeader}>
+                    <View style={s.secTitleRow}>
+                      <SecIcon size={16} color={COLORS.gray200} strokeWidth={2} />
+                      <Text style={s.secTitle}>{sec.title}</Text>
+                    </View>
+                    <TouchableOpacity>
+                      <Text style={s.secLink}>Ver todo ›</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <FlatList
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    data={sec.data}
+                    keyExtractor={p => String(p.id)}
+                    contentContainerStyle={{ gap: 10, paddingHorizontal: SPACING.lg }}
+                    renderItem={({ item }) => (
+                      <HorizCard
+                        product={item}
+                        onPress={() => goToDetail(item)}
+                      />
+                    )}
+                  />
                 </View>
-                <FlatList
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  data={sec.data}
-                  keyExtractor={p => String(p.id)}
-                  contentContainerStyle={{ gap: 10, paddingHorizontal: SPACING.lg }}
-                  renderItem={({ item }) => (
-                    <HorizCard
-                      product={item}
-                      onPress={() => goToDetail(item)}
-                    />
-                  )}
-                />
-              </View>
-            ))}
+              );
+            })}
 
             {/* ── GRID TODOS — Supabase + estáticos ── */}
             <View style={s.section}>
               <View style={s.secHeader}>
-                <Text style={s.secTitle}>🛍️ Todos los productos</Text>
+                <View style={s.secTitleRow}>
+                  <ShoppingBag size={16} color={COLORS.gray200} strokeWidth={2} />
+                  <Text style={s.secTitle}>Todos los productos</Text>
+                </View>
                 <Text style={s.secCount}>{products.length} productos</Text>
               </View>
               {loading
@@ -299,7 +318,7 @@ export default function HomeScreen({ navigation }: any) {
               ? <ActivityIndicator size="large" color={COLORS.primary} style={{ paddingVertical: 30 }} />
               : products.length === 0
               ? <View style={s.empty}>
-                  <Text style={{ fontSize: 40 }}>🔍</Text>
+                  <SearchIcon size={40} color={COLORS.gray600} strokeWidth={1.5} />
                   <Text style={s.emptyTxt}>Sin resultados para "{search}"</Text>
                 </View>
               : <View style={s.grid}>
@@ -332,11 +351,11 @@ function HorizCard({ product, onPress }: { product: any; onPress: () => void }) 
 
   return (
     <TouchableOpacity style={hc.card} onPress={onPress} activeOpacity={0.9}>
-      <View style={[hc.img, { backgroundColor: product.bgColor || product.bg_color || '#F5F5F5' }]}>
+      <View style={[hc.img, { backgroundColor: product.bgColor || product.bg_color || COLORS.gray100 }]}>
         {imageUrl ? (
           <Image source={{ uri: imageUrl }} style={hc.realImg} resizeMode="cover" />
         ) : (
-          <Text style={{ fontSize: 52 }}>{product.emoji || '📦'}</Text>
+          <ShoppingBag size={40} color={COLORS.gray200} strokeWidth={1.5} />
         )}
         {disc && (
           <View style={hc.disc}><Text style={hc.discTxt}>-{disc}%</Text></View>
@@ -348,18 +367,21 @@ function HorizCard({ product, onPress }: { product: any; onPress: () => void }) 
           <Text style={hc.oldPrice}>S/ {product.oldPrice || product.old_price}</Text>
         )}
         <Text style={hc.name} numberOfLines={2}>{product.name}</Text>
-        <Text style={hc.stars}>
-          ★ {product.rating} · {product.sold > 999
-            ? `${(product.sold / 1000).toFixed(1)}K`
-            : product.sold}
-        </Text>
+        <View style={hc.starsRow}>
+          <Star size={11} color={COLORS.gold} fill={COLORS.gold} strokeWidth={0} />
+          <Text style={hc.stars}>
+            {product.rating} · {product.sold > 999
+              ? `${(product.sold / 1000).toFixed(1)}K`
+              : product.sold}
+          </Text>
+        </View>
       </View>
       <TouchableOpacity
         style={[hc.cartBtn, inCart && { backgroundColor: COLORS.primary }]}
         onPress={() => dispatch({ type: 'ADD', id: product.id })}>
-        <Text style={[hc.cartBtnTxt, inCart && { color: '#fff' }]}>
-          {inCart ? '✓' : '🛒'}
-        </Text>
+        {inCart
+          ? <Check size={16} color="#fff" strokeWidth={2.5} />
+          : <ShoppingCart size={16} color={COLORS.gray800} strokeWidth={2} />}
       </TouchableOpacity>
     </TouchableOpacity>
   );
@@ -375,25 +397,25 @@ const hc = StyleSheet.create({
   price:     { fontSize: 16, fontWeight: FONT.black, color: COLORS.black },
   oldPrice:  { fontSize: 11, color: COLORS.gray400, textDecorationLine: 'line-through' },
   name:      { fontSize: 12, color: COLORS.gray600, lineHeight: 16, marginTop: 3, marginBottom: 4 },
-  stars:     { fontSize: 11, color: '#F5A623', fontWeight: FONT.bold },
-  cartBtn:   { margin: SPACING.sm, marginTop: 0, backgroundColor: COLORS.gold, borderRadius: RADIUS.md, paddingVertical: 8, alignItems: 'center' },
-  cartBtnTxt:{ fontSize: 16, fontWeight: FONT.bold, color: COLORS.black },
+  starsRow:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  stars:     { fontSize: 11, color: COLORS.gray600, fontWeight: FONT.semibold },
+  cartBtn:   { margin: SPACING.sm, marginTop: 6, backgroundColor: COLORS.gray100, borderRadius: RADIUS.md, paddingVertical: 8, alignItems: 'center' },
 });
 
 const s = StyleSheet.create({
-  container:      { flex: 1, backgroundColor: COLORS.gray50 },
-  topBar:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 10, backgroundColor: COLORS.gray800 },
+  container:      { flex: 1, backgroundColor: COLORS.black },
+  topBar:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 10, backgroundColor: COLORS.primary },
   logoWrap:       { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  logoIcon:       { width: 38, height: 38, backgroundColor: COLORS.primary, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
+  logoIcon:       { width: 38, height: 38, backgroundColor: COLORS.white, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
   logoText:       { fontSize: 18, fontWeight: FONT.black, color: COLORS.white, letterSpacing: -0.5 },
-  logoSub:        { fontSize: 10, color: 'rgba(255,255,255,0.6)', fontWeight: FONT.semibold },
+  logoSub:        { fontSize: 10, color: 'rgba(255,255,255,0.75)', fontWeight: FONT.semibold },
   topIcons:       { flexDirection: 'row', gap: 8 },
-  topIconBtn:     { width: 36, height: 36, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  badge:          { position: 'absolute', top: -4, right: -4, backgroundColor: COLORS.primary, borderRadius: RADIUS.full, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
-  badgeTxt:       { color: '#fff', fontSize: 9, fontWeight: FONT.black },
-  searchWrap:     { backgroundColor: COLORS.gray800, paddingHorizontal: SPACING.lg, paddingBottom: 12, gap: 8 },
+  topIconBtn:     { width: 36, height: 36, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  badge:          { position: 'absolute', top: -4, right: -4, backgroundColor: COLORS.white, borderRadius: RADIUS.full, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1, borderColor: COLORS.primary },
+  badgeTxt:       { color: COLORS.primary, fontSize: 9, fontWeight: FONT.black },
+  searchWrap:     { backgroundColor: COLORS.primary, paddingHorizontal: SPACING.lg, paddingBottom: 12, gap: 8 },
   locationRow:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  locationTxt:    { fontSize: 12, color: 'rgba(255,255,255,0.75)', fontWeight: FONT.semibold },
+  locationTxt:    { fontSize: 12, color: 'rgba(255,255,255,0.85)', fontWeight: FONT.semibold },
   searchBar:      { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white, borderRadius: RADIUS.lg, paddingHorizontal: 14, paddingVertical: 10, gap: 8 },
   searchInput:    { flex: 1, fontSize: 14, color: COLORS.black, padding: 0 },
   searchDiv:      { width: 1, height: 20, backgroundColor: COLORS.border },
@@ -409,9 +431,9 @@ const s = StyleSheet.create({
   banner:         { width: width - 32, borderRadius: RADIUS.xl, padding: SPACING.lg, flexDirection: 'row', alignItems: 'center', height: 140 },
   bannerTitle:    { fontSize: 20, fontWeight: FONT.black, color: '#fff', lineHeight: 26, marginBottom: 6 },
   bannerSub:      { fontSize: 13, fontWeight: FONT.semibold },
-  bannerEmoji:    { fontSize: 64 },
+  bannerIconWrap: { width: 64, height: 64, borderRadius: RADIUS.full, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   bannerDots:     { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 8 },
-  bannerDot:      { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.gray200 },
+  bannerDot:      { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.gray600 },
   bannerDotActive:{ backgroundColor: COLORS.primary, width: 18 },
   plusStrip:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: SPACING.lg, marginBottom: SPACING.md, backgroundColor: COLORS.primaryLight, borderRadius: RADIUS.lg, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.primary },
   plusLeft:       { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
@@ -419,15 +441,15 @@ const s = StyleSheet.create({
   plusBadgeTxt:   { color: '#fff', fontSize: 10, fontWeight: FONT.black, letterSpacing: 1 },
   plusTitle:      { fontSize: 13, fontWeight: FONT.black, color: COLORS.primaryDark },
   plusSub:        { fontSize: 11, color: COLORS.primary, fontWeight: FONT.semibold, marginTop: 1 },
-  plusArrow:      { fontSize: 20, color: COLORS.primary, fontWeight: FONT.bold },
   section:        { marginBottom: SPACING.lg },
   secHeader:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, marginBottom: SPACING.sm },
-  secTitle:       { fontSize: 16, fontWeight: FONT.black, color: COLORS.black },
-  secLink:        { fontSize: 13, color: COLORS.primary, fontWeight: FONT.bold },
+  secTitleRow:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  secTitle:       { fontSize: 16, fontWeight: FONT.black, color: COLORS.white },
+  secLink:        { fontSize: 13, color: COLORS.primaryMid, fontWeight: FONT.bold },
   secCount:       { fontSize: 12, color: COLORS.gray400, fontWeight: FONT.semibold },
   grid:           { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: SPACING.lg, gap: 10 },
   gridItem:       { width: '47.5%' },
   searchLabel:    { fontSize: 14, color: COLORS.gray400, fontWeight: FONT.semibold, paddingHorizontal: SPACING.lg, marginBottom: SPACING.sm },
-  empty:          { alignItems: 'center', paddingVertical: 48 },
-  emptyTxt:       { fontSize: 15, color: COLORS.gray400, fontWeight: FONT.semibold, marginTop: 8 },
+  empty:          { alignItems: 'center', paddingVertical: 48, gap: 10 },
+  emptyTxt:       { fontSize: 15, color: COLORS.gray400, fontWeight: FONT.semibold },
 });

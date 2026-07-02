@@ -3,22 +3,27 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ScrollView, ActivityIndicator,
-  Alert, Image, Switch,
+  Alert, Image, Switch, StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import RNFS from 'react-native-fs';
+import {
+  ChevronLeft, Camera, Image as ImageIcon, X, FileText,
+  Wallet, Tag, ClipboardList, Plus, Clock, XCircle,
+} from 'lucide-react-native';
 import { COLORS, SPACING, RADIUS, FONT, SHADOW } from '../theme';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context';
+import { getCategoryIcon } from '../utils/categoryIcons';
 
 const CATEGORIES = [
-  { id: 'electro', label: 'Electrónica', emoji: '📱' },
-  { id: 'hogar',   label: 'Hogar',       emoji: '🛋️' },
-  { id: 'moda',    label: 'Moda',        emoji: '👟' },
-  { id: 'belleza', label: 'Belleza',     emoji: '💄' },
-  { id: 'deporte', label: 'Deporte',     emoji: '⚽' },
-  { id: 'otros',   label: 'Otros',       emoji: '🛍️' },
+  { id: 'electro', label: 'Electrónica' },
+  { id: 'hogar',   label: 'Hogar'       },
+  { id: 'moda',    label: 'Moda'        },
+  { id: 'belleza', label: 'Belleza'     },
+  { id: 'deporte', label: 'Deporte'     },
+  { id: 'otros',   label: 'Otros'       },
 ];
 
 export default function SellerAddProductScreen({ route, navigation }: any) {
@@ -285,9 +290,10 @@ export default function SellerAddProductScreen({ route, navigation }: any) {
   if (checkingApproval) {
     return (
       <View style={[ap.container, { paddingTop: insets.top }]}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
         <View style={ap.header}>
           <TouchableOpacity style={ap.backBtn} onPress={() => navigation.goBack()}>
-            <Text style={ap.backTxt}>‹</Text>
+            <ChevronLeft size={22} color={COLORS.white} strokeWidth={2.5} />
           </TouchableOpacity>
           <Text style={ap.headerTitle}>Nuevo producto</Text>
           <View style={{ width: 36 }} />
@@ -303,17 +309,20 @@ export default function SellerAddProductScreen({ route, navigation }: any) {
   if (sellerStatus !== 'approved') {
     return (
       <View style={[ap.container, { paddingTop: insets.top }]}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
         <View style={ap.header}>
           <TouchableOpacity style={ap.backBtn} onPress={() => navigation.goBack()}>
-            <Text style={ap.backTxt}>‹</Text>
+            <ChevronLeft size={22} color={COLORS.white} strokeWidth={2.5} />
           </TouchableOpacity>
           <Text style={ap.headerTitle}>Nuevo producto</Text>
           <View style={{ width: 36 }} />
         </View>
         <View style={ap.blockedWrap}>
-          <Text style={{ fontSize: 56, marginBottom: 16 }}>
-            {sellerStatus === 'rejected' ? '❌' : '⏳'}
-          </Text>
+          <View style={[ap.blockedIconWrap, sellerStatus === 'rejected' && { backgroundColor: COLORS.redLight }]}>
+            {sellerStatus === 'rejected'
+              ? <XCircle size={36} color={COLORS.primary} strokeWidth={1.8} />
+              : <Clock size={36} color={COLORS.amber} strokeWidth={1.8} />}
+          </View>
           <Text style={ap.blockedTitle}>
             {sellerStatus === 'rejected'
               ? 'Tu tienda no fue aprobada'
@@ -337,9 +346,10 @@ export default function SellerAddProductScreen({ route, navigation }: any) {
   // ── Formulario normal ─────────────────────────────────────────
   return (
     <View style={[ap.container, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       <View style={ap.header}>
         <TouchableOpacity style={ap.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={ap.backTxt}>‹</Text>
+          <ChevronLeft size={22} color={COLORS.white} strokeWidth={2.5} />
         </TouchableOpacity>
         <Text style={ap.headerTitle}>{isEditing ? 'Editar producto' : 'Nuevo producto'}</Text>
         <View style={{ width: 36 }} />
@@ -352,7 +362,10 @@ export default function SellerAddProductScreen({ route, navigation }: any) {
 
         {/* ── FOTOS ── */}
         <View style={ap.card}>
-          <Text style={ap.cardTitle}>📸 Fotos del producto</Text>
+          <View style={ap.cardTitleRow}>
+            <Camera size={16} color={COLORS.gray800} strokeWidth={2} />
+            <Text style={ap.cardTitle}>Fotos del producto</Text>
+          </View>
           <Text style={ap.cardSub}>
             Agrega hasta 3 fotos.{'  '}
             <Text style={{ color: validImages.length > 0 ? COLORS.green : COLORS.primary, fontWeight: FONT.bold }}>
@@ -371,12 +384,12 @@ export default function SellerAddProductScreen({ route, navigation }: any) {
                   <>
                     <Image source={{ uri: images[i] }} style={ap.imagePreview} />
                     <TouchableOpacity style={ap.removeImg} onPress={() => removeImage(i)}>
-                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: FONT.black }}>✕</Text>
+                      <X size={12} color="#fff" strokeWidth={3} />
                     </TouchableOpacity>
                   </>
                 ) : (
                   <View style={ap.imagePlaceholder}>
-                    <Text style={{ fontSize: i === 0 ? 32 : 24 }}>📷</Text>
+                    <ImageIcon size={i === 0 ? 28 : 22} color={COLORS.gray400} strokeWidth={1.5} />
                     <Text style={ap.imageHint}>{i === 0 ? 'Principal' : `Foto ${i + 1}`}</Text>
                   </View>
                 )}
@@ -387,7 +400,10 @@ export default function SellerAddProductScreen({ route, navigation }: any) {
 
         {/* ── DATOS BÁSICOS ── */}
         <View style={ap.card}>
-          <Text style={ap.cardTitle}>📝 Información del producto</Text>
+          <View style={ap.cardTitleRow}>
+            <FileText size={16} color={COLORS.gray800} strokeWidth={2} />
+            <Text style={ap.cardTitle}>Información del producto</Text>
+          </View>
 
           <View style={ap.field}>
             <Text style={ap.label}>Nombre completo *</Text>
@@ -435,7 +451,10 @@ export default function SellerAddProductScreen({ route, navigation }: any) {
 
         {/* ── PRECIOS Y STOCK ── */}
         <View style={ap.card}>
-          <Text style={ap.cardTitle}>💰 Precio y stock</Text>
+          <View style={ap.cardTitleRow}>
+            <Wallet size={16} color={COLORS.gray800} strokeWidth={2} />
+            <Text style={ap.cardTitle}>Precio y stock</Text>
+          </View>
           <View style={ap.priceRow}>
             <View style={[ap.field, { flex: 1 }]}>
               <Text style={ap.label}>Precio (S/) *</Text>
@@ -490,27 +509,37 @@ export default function SellerAddProductScreen({ route, navigation }: any) {
 
         {/* ── CATEGORÍA ── */}
         <View style={ap.card}>
-          <Text style={ap.cardTitle}>🏷️ Categoría *</Text>
+          <View style={ap.cardTitleRow}>
+            <Tag size={16} color={COLORS.gray800} strokeWidth={2} />
+            <Text style={ap.cardTitle}>Categoría *</Text>
+          </View>
           {errors.category ? <Text style={ap.errorTxt}>{errors.category}</Text> : null}
           <View style={ap.catsRow}>
-            {CATEGORIES.map(cat => (
-              <TouchableOpacity
-                key={cat.id}
-                style={[ap.catBtn, category === cat.id && ap.catBtnActive]}
-                onPress={() => { setCategory(cat.id); setErrors(e => ({ ...e, category: '' })); }}
-                activeOpacity={0.8}>
-                <Text style={{ fontSize: 20 }}>{cat.emoji}</Text>
-                <Text style={[ap.catLabel, category === cat.id && ap.catLabelActive]}>
-                  {cat.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {CATEGORIES.map(cat => {
+              const Icon = getCategoryIcon(cat.id);
+              const active = category === cat.id;
+              return (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[ap.catBtn, active && ap.catBtnActive]}
+                  onPress={() => { setCategory(cat.id); setErrors(e => ({ ...e, category: '' })); }}
+                  activeOpacity={0.8}>
+                  <Icon size={16} color={active ? COLORS.primary : COLORS.gray600} strokeWidth={1.8} />
+                  <Text style={[ap.catLabel, active && ap.catLabelActive]}>
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
         {/* ── ESPECIFICACIONES ── */}
         <View style={ap.card}>
-          <Text style={ap.cardTitle}>📋 Especificaciones</Text>
+          <View style={ap.cardTitleRow}>
+            <ClipboardList size={16} color={COLORS.gray800} strokeWidth={2} />
+            <Text style={ap.cardTitle}>Especificaciones</Text>
+          </View>
           <Text style={ap.cardSub}>Formato: "Clave: Valor" — Ej: "Color: Negro"</Text>
           {specs.map((spec, i) => (
             <View key={i} style={ap.specRow}>
@@ -523,13 +552,14 @@ export default function SellerAddProductScreen({ route, navigation }: any) {
               </View>
               {specs.length > 1 && (
                 <TouchableOpacity style={ap.removeSpecBtn} onPress={() => removeSpec(i)}>
-                  <Text style={{ color: COLORS.red, fontSize: 18 }}>✕</Text>
+                  <X size={18} color={COLORS.primary} strokeWidth={2.5} />
                 </TouchableOpacity>
               )}
             </View>
           ))}
           <TouchableOpacity style={ap.addSpecBtn} onPress={addSpec}>
-            <Text style={ap.addSpecBtnTxt}>+ Agregar especificación</Text>
+            <Plus size={14} color={COLORS.primary} strokeWidth={2.5} />
+            <Text style={ap.addSpecBtnTxt}>Agregar especificación</Text>
           </TouchableOpacity>
         </View>
 
@@ -559,13 +589,13 @@ export default function SellerAddProductScreen({ route, navigation }: any) {
 }
 
 const ap = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: COLORS.gray50 },
-  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14, backgroundColor: COLORS.white, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
-  backBtn:         { width: 36, height: 36, backgroundColor: COLORS.gray100, borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
-  backTxt:         { fontSize: 24, color: COLORS.gray800, fontWeight: FONT.bold, lineHeight: 28 },
-  headerTitle:     { fontSize: 17, fontWeight: FONT.black, color: COLORS.gray800 },
-  card:            { backgroundColor: COLORS.white, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.md, borderWidth: 0.5, borderColor: COLORS.border, ...SHADOW.card },
-  cardTitle:       { fontSize: 15, fontWeight: FONT.black, color: COLORS.gray800, marginBottom: 4 },
+  container:       { flex: 1, backgroundColor: COLORS.black },
+  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14, backgroundColor: COLORS.primary },
+  backBtn:         { width: 36, height: 36, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
+  headerTitle:     { fontSize: 17, fontWeight: FONT.black, color: COLORS.white },
+  card:            { backgroundColor: COLORS.white, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.md, ...SHADOW.card },
+  cardTitleRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  cardTitle:       { fontSize: 15, fontWeight: FONT.black, color: COLORS.gray800 },
   cardSub:         { fontSize: 12, color: COLORS.gray400, marginBottom: SPACING.md },
   imagesRow:       { flexDirection: 'row', gap: 10 },
   imageSlot:       { width: 90, height: 90, borderRadius: RADIUS.lg, overflow: 'hidden', position: 'relative' },
@@ -573,7 +603,7 @@ const ap = StyleSheet.create({
   imagePreview:    { width: '100%', height: '100%' },
   imagePlaceholder:{ width: '100%', height: '100%', backgroundColor: COLORS.gray100, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: COLORS.border, borderStyle: 'dashed', borderRadius: RADIUS.lg, gap: 4 },
   imageHint:       { fontSize: 10, color: COLORS.gray400, fontWeight: FONT.semibold },
-  removeImg:       { position: 'absolute', top: 4, right: 4, backgroundColor: COLORS.red, borderRadius: RADIUS.full, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
+  removeImg:       { position: 'absolute', top: 4, right: 4, backgroundColor: COLORS.primary, borderRadius: RADIUS.full, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
   field:           { marginBottom: SPACING.md },
   label:           { fontSize: 13, fontWeight: FONT.bold, color: COLORS.gray600, marginBottom: 6 },
   optional:        { fontWeight: FONT.regular, color: COLORS.gray400, fontSize: 12 },
@@ -592,12 +622,13 @@ const ap = StyleSheet.create({
   catLabelActive:  { color: COLORS.primary },
   specRow:         { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   removeSpecBtn:   { padding: 4 },
-  addSpecBtn:      { alignSelf: 'flex-start', marginTop: 4 },
+  addSpecBtn:      { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 4 },
   addSpecBtnTxt:   { fontSize: 13, color: COLORS.primary, fontWeight: FONT.bold },
   saveBtn:         { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: 15, alignItems: 'center', ...SHADOW.strong },
   saveBtnTxt:      { color: COLORS.white, fontSize: 15, fontWeight: FONT.black },
   blockedWrap:     { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.lg },
-  blockedTitle:    { fontSize: 18, fontWeight: FONT.black, color: COLORS.gray800, textAlign: 'center', marginBottom: 10 },
+  blockedIconWrap: { width: 76, height: 76, borderRadius: RADIUS.full, backgroundColor: COLORS.amberLight, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  blockedTitle:    { fontSize: 18, fontWeight: FONT.black, color: COLORS.white, textAlign: 'center', marginBottom: 10 },
   blockedSub:      { fontSize: 13, color: COLORS.gray400, textAlign: 'center', lineHeight: 20, marginBottom: 24, paddingHorizontal: 10 },
   blockedBtn:      { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: 14, paddingHorizontal: 32, ...SHADOW.strong },
   blockedBtnTxt:   { color: '#fff', fontSize: 14, fontWeight: FONT.black },

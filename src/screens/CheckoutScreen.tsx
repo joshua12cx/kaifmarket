@@ -2,26 +2,31 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, TextInput, Alert, ActivityIndicator,
-  KeyboardAvoidingView, Platform, Image,
+  StyleSheet, TextInput, ActivityIndicator,
+  KeyboardAvoidingView, Platform, Image, StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  ChevronLeft, ShoppingBag, User, Package, Zap, Store,
+  MapPin, CreditCard, Wallet, Smartphone, Receipt, Info,
+  ArrowRight, Package as PackageIcon,
+} from 'lucide-react-native';
 import { COLORS, SPACING, RADIUS, FONT, SHADOW } from '../theme';
 import { PRODUCTS } from '../data';
 import { useCart, useAuth } from '../context';
 import { supabase } from '../lib/supabase';
 
 const DELIVERY_OPTIONS = [
-  { id: 'standard', label: 'Estándar', detail: 'Mañana, 9:00–18:00', price: 0, icon: '📦' },
-  { id: 'express',  label: 'Exprés',   detail: 'Hoy, 14:00–18:00',   price: 8, icon: '⚡' },
-  { id: 'pickup',   label: 'Recojo',   detail: 'Hoy desde las 10:00', price: 0, icon: '🏪' },
+  { id: 'standard', label: 'Estándar', detail: 'Mañana, 9:00–18:00', price: 0, icon: Package },
+  { id: 'express',  label: 'Exprés',   detail: 'Hoy, 14:00–18:00',   price: 8, icon: Zap },
+  { id: 'pickup',   label: 'Recojo',   detail: 'Hoy desde las 10:00', price: 0, icon: Store },
 ];
 
 const PAYMENT_OPTIONS = [
-  { id: 'cash', label: 'Efectivo al entregar',   icon: '💵' },
-  { id: 'yape', label: 'Yape',                   icon: '📱' },
-  { id: 'plin', label: 'Plin',                   icon: '💜' },
-  { id: 'card', label: 'Tarjeta (próximamente)', icon: '💳', disabled: true },
+  { id: 'cash', label: 'Efectivo al entregar',   icon: Wallet },
+  { id: 'yape', label: 'Yape',                   icon: Smartphone },
+  { id: 'plin', label: 'Plin',                   icon: Smartphone },
+  { id: 'card', label: 'Tarjeta (próximamente)', icon: CreditCard, disabled: true },
 ];
 
 export default function CheckoutScreen({ navigation }: any) {
@@ -75,7 +80,7 @@ export default function CheckoutScreen({ navigation }: any) {
       return {
         product: {
           ...raw,
-          bgColor:  raw.bgColor  || raw.bg_color  || '#F5F5F5',
+          bgColor:  raw.bgColor  || raw.bg_color  || COLORS.gray100,
           oldPrice: raw.oldPrice || raw.old_price  || null,
           imageUrl: raw.image_url || null,
           emoji:    raw.emoji    || '📦',
@@ -170,7 +175,7 @@ export default function CheckoutScreen({ navigation }: any) {
 
   if (prodsLoading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.white }}>
         <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
@@ -181,11 +186,12 @@ export default function CheckoutScreen({ navigation }: any) {
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[cs.container, { paddingTop: insets.top }]}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
 
         {/* ── HEADER ── */}
         <View style={cs.header}>
           <TouchableOpacity style={cs.backBtn} onPress={() => navigation.goBack()}>
-            <Text style={cs.backTxt}>‹</Text>
+            <ChevronLeft size={22} color={COLORS.white} strokeWidth={2.5} />
           </TouchableOpacity>
           <Text style={cs.headerTitle}>Finalizar compra</Text>
           <View style={{ width: 36 }} />
@@ -193,15 +199,18 @@ export default function CheckoutScreen({ navigation }: any) {
 
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 120 }}
+          contentContainerStyle={{ paddingBottom: 120, paddingTop: SPACING.lg }}
           keyboardShouldPersistTaps="handled">
 
           {/* ── RESUMEN DEL PEDIDO ── */}
           <View style={cs.card}>
-            <Text style={cs.cardTitle}>🛒 Tu pedido</Text>
+            <View style={cs.cardTitleRow}>
+              <ShoppingBag size={16} color={COLORS.gray800} strokeWidth={2} />
+              <Text style={cs.cardTitle}>Tu pedido</Text>
+            </View>
             {cartEntries.map(({ product, qty }) => (
               <View key={product.id} style={cs.orderItem}>
-                <View style={[cs.orderImg, { backgroundColor: product.bgColor }]}>
+                <View style={[cs.orderImg, { backgroundColor: product.imageUrl ? COLORS.gray200 : product.bgColor }]}>
                   {product.imageUrl ? (
                     <Image
                       source={{ uri: product.imageUrl }}
@@ -209,7 +218,7 @@ export default function CheckoutScreen({ navigation }: any) {
                       resizeMode="cover"
                     />
                   ) : (
-                    <Text style={{ fontSize: 22 }}>{product.emoji}</Text>
+                    <PackageIcon size={20} color={COLORS.gray400} strokeWidth={1.5} />
                   )}
                 </View>
                 <View style={{ flex: 1 }}>
@@ -224,9 +233,10 @@ export default function CheckoutScreen({ navigation }: any) {
           {/* ── DATOS PERSONALES ── */}
           <View style={cs.card}>
             <View style={cs.cardTitleRow}>
-              <Text style={cs.cardTitle}>👤 Datos de contacto</Text>
+              <User size={16} color={COLORS.gray800} strokeWidth={2} />
+              <Text style={cs.cardTitle}>Datos de contacto</Text>
               {!user && (
-                <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+                <TouchableOpacity onPress={() => navigation.navigate('Login')} style={{ marginLeft: 'auto' }}>
                   <Text style={cs.loginLink}>¿Tienes cuenta? Inicia sesión</Text>
                 </TouchableOpacity>
               )}
@@ -281,30 +291,42 @@ export default function CheckoutScreen({ navigation }: any) {
 
           {/* ── TIPO DE ENTREGA ── */}
           <View style={cs.card}>
-            <Text style={cs.cardTitle}>📦 Tipo de entrega</Text>
-            {DELIVERY_OPTIONS.map(opt => (
-              <TouchableOpacity
-                key={opt.id}
-                style={[cs.optRow, delivery === opt.id && cs.optRowActive]}
-                onPress={() => setDelivery(opt.id)}
-                activeOpacity={0.8}>
-                <View style={[cs.radio, delivery === opt.id && cs.radioActive]} />
-                <Text style={{ fontSize: 20 }}>{opt.icon}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={cs.optLabel}>{opt.label}</Text>
-                  <Text style={cs.optDetail}>{opt.detail}</Text>
-                </View>
-                <Text style={[cs.optPrice, opt.price === 0 && { color: COLORS.green }]}>
-                  {opt.price === 0 ? 'Gratis' : `S/ ${opt.price}`}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            <View style={cs.cardTitleRow}>
+              <Package size={16} color={COLORS.gray800} strokeWidth={2} />
+              <Text style={cs.cardTitle}>Tipo de entrega</Text>
+            </View>
+            {DELIVERY_OPTIONS.map(opt => {
+              const OptIcon = opt.icon;
+              const active = delivery === opt.id;
+              return (
+                <TouchableOpacity
+                  key={opt.id}
+                  style={[cs.optRow, active && cs.optRowActive]}
+                  onPress={() => setDelivery(opt.id)}
+                  activeOpacity={0.8}>
+                  <View style={[cs.radio, active && cs.radioActive]} />
+                  <View style={[cs.optIconWrap, active && cs.optIconWrapActive]}>
+                    <OptIcon size={16} color={active ? COLORS.primary : COLORS.gray600} strokeWidth={2} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={cs.optLabel}>{opt.label}</Text>
+                    <Text style={cs.optDetail}>{opt.detail}</Text>
+                  </View>
+                  <Text style={[cs.optPrice, opt.price === 0 && { color: COLORS.green }]}>
+                    {opt.price === 0 ? 'Gratis' : `S/ ${opt.price}`}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           {/* ── DIRECCIÓN ── */}
           {delivery !== 'pickup' && (
             <View style={cs.card}>
-              <Text style={cs.cardTitle}>📍 Dirección de entrega</Text>
+              <View style={cs.cardTitleRow}>
+                <MapPin size={16} color={COLORS.gray800} strokeWidth={2} />
+                <Text style={cs.cardTitle}>Dirección de entrega</Text>
+              </View>
 
               <View style={cs.field}>
                 <Text style={cs.label}>Dirección *</Text>
@@ -352,27 +374,40 @@ export default function CheckoutScreen({ navigation }: any) {
 
           {/* ── MÉTODO DE PAGO ── */}
           <View style={cs.card}>
-            <Text style={cs.cardTitle}>💳 Método de pago</Text>
-            {PAYMENT_OPTIONS.map(opt => (
-              <TouchableOpacity
-                key={opt.id}
-                style={[
-                  cs.optRow,
-                  payment === opt.id && cs.optRowActive,
-                  (opt as any).disabled && { opacity: 0.5 },
-                ]}
-                onPress={() => !(opt as any).disabled && setPayment(opt.id)}
-                activeOpacity={0.8}>
-                <View style={[cs.radio, payment === opt.id && cs.radioActive]} />
-                <Text style={{ fontSize: 20 }}>{opt.icon}</Text>
-                <Text style={cs.optLabel}>{opt.label}</Text>
-              </TouchableOpacity>
-            ))}
+            <View style={cs.cardTitleRow}>
+              <CreditCard size={16} color={COLORS.gray800} strokeWidth={2} />
+              <Text style={cs.cardTitle}>Método de pago</Text>
+            </View>
+            {PAYMENT_OPTIONS.map(opt => {
+              const OptIcon = opt.icon;
+              const active = payment === opt.id;
+              const disabled = (opt as any).disabled;
+              return (
+                <TouchableOpacity
+                  key={opt.id}
+                  style={[
+                    cs.optRow,
+                    active && cs.optRowActive,
+                    disabled && { opacity: 0.5 },
+                  ]}
+                  onPress={() => !disabled && setPayment(opt.id)}
+                  activeOpacity={0.8}>
+                  <View style={[cs.radio, active && cs.radioActive]} />
+                  <View style={[cs.optIconWrap, active && cs.optIconWrapActive]}>
+                    <OptIcon size={16} color={active ? COLORS.primary : COLORS.gray600} strokeWidth={2} />
+                  </View>
+                  <Text style={cs.optLabel}>{opt.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           {/* ── RESUMEN DE PRECIOS ── */}
           <View style={cs.card}>
-            <Text style={cs.cardTitle}>💰 Resumen</Text>
+            <View style={cs.cardTitleRow}>
+              <Receipt size={16} color={COLORS.gray800} strokeWidth={2} />
+              <Text style={cs.cardTitle}>Resumen</Text>
+            </View>
             <View style={cs.sumRow}>
               <Text style={cs.sumLabel}>Subtotal</Text>
               <Text style={cs.sumVal}>S/ {subtotal}</Text>
@@ -392,7 +427,7 @@ export default function CheckoutScreen({ navigation }: any) {
           {/* ── AVISO INVITADO ── */}
           {!user && (
             <View style={cs.guestNotice}>
-              <Text style={cs.guestIcon}>ℹ️</Text>
+              <Info size={18} color={COLORS.blue} strokeWidth={2} />
               <Text style={cs.guestTxt}>
                 Comprando como invitado recibirás tu recibo en el email indicado, pero no tendrás historial de compras.{' '}
                 <Text
@@ -420,7 +455,12 @@ export default function CheckoutScreen({ navigation }: any) {
             activeOpacity={0.85}>
             {loading
               ? <ActivityIndicator color={COLORS.white} size="small" />
-              : <Text style={cs.confirmBtnTxt}>Confirmar pedido →</Text>}
+              : (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={cs.confirmBtnTxt}>Confirmar pedido</Text>
+                  <ArrowRight size={16} color={COLORS.white} strokeWidth={2.5} />
+                </View>
+              )}
           </TouchableOpacity>
         </View>
 
@@ -430,14 +470,13 @@ export default function CheckoutScreen({ navigation }: any) {
 }
 
 const cs = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: COLORS.gray50 },
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14, backgroundColor: COLORS.white, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
-  backBtn:      { width: 36, height: 36, backgroundColor: COLORS.gray100, borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
-  backTxt:      { fontSize: 24, color: COLORS.gray800, fontWeight: FONT.bold, lineHeight: 28 },
-  headerTitle:  { fontSize: 17, fontWeight: FONT.black, color: COLORS.gray800 },
-  card:         { backgroundColor: COLORS.white, marginHorizontal: SPACING.lg, marginTop: SPACING.md, borderRadius: RADIUS.xl, padding: SPACING.lg, borderWidth: 0.5, borderColor: COLORS.border, ...SHADOW.card },
-  cardTitle:    { fontSize: 15, fontWeight: FONT.black, color: COLORS.gray800, marginBottom: SPACING.md },
-  cardTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.md },
+  container:    { flex: 1, backgroundColor: COLORS.black },
+  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14, backgroundColor: COLORS.primary },
+  backBtn:      { width: 36, height: 36, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
+  headerTitle:  { fontSize: 17, fontWeight: FONT.black, color: COLORS.white },
+  card:         { backgroundColor: COLORS.white, marginHorizontal: SPACING.lg, marginBottom: SPACING.md, borderRadius: RADIUS.xl, padding: SPACING.lg, ...SHADOW.card },
+  cardTitle:    { fontSize: 15, fontWeight: FONT.black, color: COLORS.gray800 },
+  cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: SPACING.md },
   loginLink:    { fontSize: 12, color: COLORS.primary, fontWeight: FONT.bold },
   orderItem:    { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: SPACING.sm },
   orderImg:     { width: 44, height: 44, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
@@ -456,6 +495,8 @@ const cs = StyleSheet.create({
   optRowActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight },
   radio:        { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: COLORS.border },
   radioActive:  { borderColor: COLORS.primary, backgroundColor: COLORS.primary },
+  optIconWrap:  { width: 32, height: 32, borderRadius: RADIUS.md, backgroundColor: COLORS.gray100, alignItems: 'center', justifyContent: 'center' },
+  optIconWrapActive: { backgroundColor: COLORS.white },
   optLabel:     { fontSize: 14, fontWeight: FONT.bold, color: COLORS.gray800, flex: 1 },
   optDetail:    { fontSize: 12, color: COLORS.gray400, marginTop: 2 },
   optPrice:     { fontSize: 14, fontWeight: FONT.black, color: COLORS.gray800 },
@@ -465,12 +506,11 @@ const cs = StyleSheet.create({
   totalRow:     { borderTopWidth: 0.5, borderTopColor: COLORS.border, marginTop: 6, paddingTop: 10 },
   totalLabel:   { fontSize: 16, fontWeight: FONT.black, color: COLORS.gray800 },
   totalVal:     { fontSize: 20, fontWeight: FONT.black, color: COLORS.primary },
-  guestNotice:  { flexDirection: 'row', gap: 10, backgroundColor: COLORS.blueLight, marginHorizontal: SPACING.lg, marginTop: SPACING.md, borderRadius: RADIUS.lg, padding: SPACING.md },
-  guestIcon:    { fontSize: 18 },
+  guestNotice:  { flexDirection: 'row', gap: 10, backgroundColor: COLORS.blueLight, marginHorizontal: SPACING.lg, marginBottom: SPACING.md, borderRadius: RADIUS.lg, padding: SPACING.md },
   guestTxt:     { flex: 1, fontSize: 13, color: COLORS.blue, lineHeight: 19 },
   bottomBar:    { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', gap: 16, padding: SPACING.lg, backgroundColor: COLORS.white, borderTopWidth: 0.5, borderTopColor: COLORS.border, ...SHADOW.strong },
   bottomLabel:  { fontSize: 12, color: COLORS.gray400 },
   bottomTotal:  { fontSize: 20, fontWeight: FONT.black, color: COLORS.gray800 },
-  confirmBtn:   { flex: 1, backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: 15, alignItems: 'center', ...SHADOW.strong },
+  confirmBtn:   { flex: 1, backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: 15, alignItems: 'center', justifyContent: 'center', ...SHADOW.strong },
   confirmBtnTxt:{ color: COLORS.white, fontSize: 15, fontWeight: FONT.black },
 });

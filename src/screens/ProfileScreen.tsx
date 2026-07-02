@@ -1,7 +1,12 @@
 // src/screens/ProfileScreen.tsx
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, StatusBar } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  Package, ShoppingBag, Undo2, Sparkles, Tag, Star,
+  MessageCircle, Heart, RefreshCw, User, Clock,
+  Store, MapPin, Settings, ChevronRight, Lock, Wallet,
+} from 'lucide-react-native';
 import { COLORS, SPACING, RADIUS, FONT, SHADOW } from '../theme';
 import { ORDERS, PRODUCTS } from '../data';
 import { subscribePlus } from '../services';
@@ -11,36 +16,36 @@ const MENU_GROUPS = [
   {
     label: 'Compras',
     items: [
-      { icon: '📦', label: 'Mis pedidos',          sub: '',                        key: 'orders'  },
-      { icon: '🛍️', label: 'Productos comprados',  sub: '',                        key: 'bought'  },
-      { icon: '↩️', label: 'Devoluciones',          sub: '',                        key: 'returns' },
+      { icon: Package,    label: 'Mis pedidos',          sub: '',                              key: 'orders'  },
+      { icon: ShoppingBag,label: 'Productos comprados',  sub: '',                              key: 'bought'  },
+      { icon: Undo2,      label: 'Devoluciones',         sub: '',                              key: 'returns' },
     ],
   },
   {
     label: 'Beneficios',
     items: [
-      { icon: '⚡', label: 'Kaif Plus',             sub: 'Cashback y envío prioritario', key: 'plus'    },
-      { icon: '🏷️', label: 'Mis cupones',           sub: 'KAIF10 disponible',            key: 'coupons' },
-      { icon: '⭐', label: 'Categoría favorita',    sub: 'Hasta −40%',                   key: 'fav_cat' },
+      { icon: Sparkles, label: 'Kaif Plus',          sub: 'Cashback y envío prioritario', key: 'plus'    },
+      { icon: Tag,      label: 'Mis cupones',        sub: 'KAIF10 disponible',            key: 'coupons' },
+      { icon: Star,     label: 'Categoría favorita', sub: 'Hasta −40%',                   key: 'fav_cat' },
     ],
   },
   {
     label: 'Mi Kaif Market',
     items: [
-      { icon: '💬', label: 'Reseñas y preguntas',  sub: '', key: 'reviews' },
-      { icon: '❤️', label: 'Favoritos',             sub: '', key: 'favs'   },
-      { icon: '🔄', label: 'Comparados',            sub: '', key: 'compare'},
-      { icon: '👤', label: 'Mi perfil',             sub: '', key: 'profile'},
-      { icon: '🕐', label: 'Historial',             sub: '', key: 'history'},
+      { icon: MessageCircle, label: 'Reseñas y preguntas', sub: '', key: 'reviews' },
+      { icon: Heart,         label: 'Favoritos',           sub: '', key: 'favs'   },
+      { icon: RefreshCw,     label: 'Comparados',          sub: '', key: 'compare'},
+      { icon: User,          label: 'Mi perfil',           sub: '', key: 'profile'},
+      { icon: Clock,         label: 'Historial',           sub: '', key: 'history'},
     ],
   },
   {
     label: 'Otro',
     items: [
-      { icon: '💬', label: 'Chats',                 sub: 'Con soporte y vendedores', key: 'chats'   },
-      { icon: '🏪', label: 'Vender en Kaif Market', sub: 'Administra tu tienda',     key: 'sell'    },
-      { icon: '📍', label: 'Puntos de recogida',    sub: '',                         key: 'pickup'  },
-      { icon: '⚙️', label: 'Configuración',         sub: '',                         key: 'settings'},
+      { icon: MessageCircle, label: 'Chats',                 sub: 'Con soporte y vendedores', key: 'chats'   },
+      { icon: Store,         label: 'Vender en Kaif Market', sub: 'Administra tu tienda',     key: 'sell'    },
+      { icon: MapPin,        label: 'Puntos de recogida',    sub: '',                         key: 'pickup'  },
+      { icon: Settings,      label: 'Configuración',         sub: '',                         key: 'settings'},
     ],
   },
 ];
@@ -122,6 +127,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   return (
     <View style={[ps.container, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       <ScrollView showsVerticalScrollIndicator={false}>
 
         {/* ── HEADER ── */}
@@ -132,7 +138,7 @@ export default function ProfileScreen({ navigation }: any) {
             </View>
             {isPlus && (
               <View style={ps.plusDot}>
-                <Text style={{ color: '#fff', fontSize: 8, fontWeight: FONT.black }}>+</Text>
+                <Text style={{ color: COLORS.primary, fontSize: 8, fontWeight: FONT.black }}>+</Text>
               </View>
             )}
           </View>
@@ -141,12 +147,13 @@ export default function ProfileScreen({ navigation }: any) {
             <Text style={ps.userSub}>{displayEmail}</Text>
             {user?.is_seller && (
               <View style={ps.sellerBadge}>
-                <Text style={ps.sellerBadgeTxt}>🏪 Vendedor</Text>
+                <Store size={11} color={COLORS.amber} strokeWidth={2} />
+                <Text style={ps.sellerBadgeTxt}>Vendedor</Text>
               </View>
             )}
           </View>
           <TouchableOpacity style={ps.chatBtn}>
-            <Text style={{ fontSize: 20 }}>💬</Text>
+            <MessageCircle size={20} color={COLORS.white} strokeWidth={2} />
           </TouchableOpacity>
         </View>
 
@@ -156,7 +163,8 @@ export default function ProfileScreen({ navigation }: any) {
             style={ps.loginBtn}
             onPress={() => navigation.navigate('Login')}
             activeOpacity={0.85}>
-            <Text style={ps.loginBtnTxt}>🔐  Iniciar sesión / Registrarse</Text>
+            <Lock size={16} color={COLORS.white} strokeWidth={2} />
+            <Text style={ps.loginBtnTxt}>Iniciar sesión / Registrarse</Text>
           </TouchableOpacity>
         ) : (
           <View style={ps.logoutRow}>
@@ -165,7 +173,8 @@ export default function ProfileScreen({ navigation }: any) {
                 style={ps.sellerBtn}
                 onPress={() => navigation.navigate('SellerDashboard')}
                 activeOpacity={0.85}>
-                <Text style={ps.sellerBtnTxt}>🏪 Mi tienda</Text>
+                <Store size={15} color={COLORS.amber} strokeWidth={2} />
+                <Text style={ps.sellerBtnTxt}>Mi tienda</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
@@ -192,7 +201,7 @@ export default function ProfileScreen({ navigation }: any) {
               </Text>
             </View>
             <Text style={ps.cashbackLabel}>
-              {isPlus ? '✦ Cashback acumulado este mes' : 'Activa Kaif Plus para ganar cashback'}
+              {isPlus ? 'Cashback acumulado este mes' : 'Activa Kaif Plus para ganar cashback'}
             </Text>
             <View style={ps.progressBg}>
               <View style={[ps.progressFill, { width: `${isPlus ? cashbackPct : 0}%` as any }]} />
@@ -201,7 +210,9 @@ export default function ProfileScreen({ navigation }: any) {
               {isPlus ? '¡Sigue comprando para aumentarlo!' : 'Suscríbete por S/ 19.90/mes ›'}
             </Text>
           </View>
-          <Text style={{ fontSize: 40 }}>💰</Text>
+          <View style={ps.cashbackIconWrap}>
+            <Wallet size={28} color={COLORS.primary} strokeWidth={1.8} />
+          </View>
         </TouchableOpacity>
 
         {/* ── PEDIDO RECIENTE ── */}
@@ -214,8 +225,8 @@ export default function ProfileScreen({ navigation }: any) {
               </TouchableOpacity>
             </View>
             <View style={ps.recentRow}>
-              <View style={[ps.recentImg, { backgroundColor: firstProduct.bgColor }]}>
-                <Text style={{ fontSize: 28 }}>{firstProduct.emoji}</Text>
+              <View style={ps.recentImg}>
+                <Package size={26} color={COLORS.gray400} strokeWidth={1.5} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={ps.recentName} numberOfLines={1}>
@@ -243,7 +254,7 @@ export default function ProfileScreen({ navigation }: any) {
           ].map((stat, i) => (
             <View
               key={stat.label}
-              style={[ps.stat, i < 3 && { borderRightWidth: 1, borderRightColor: COLORS.border }]}>
+              style={[ps.stat, i < 3 && { borderRightWidth: 0.5, borderRightColor: COLORS.border }]}>
               <Text style={ps.statVal}>{stat.value}</Text>
               <Text style={ps.statLbl}>{stat.label}</Text>
             </View>
@@ -255,25 +266,28 @@ export default function ProfileScreen({ navigation }: any) {
           <View key={group.label} style={ps.group}>
             <Text style={ps.groupLabel}>{group.label}</Text>
             <View style={ps.groupCard}>
-              {group.items.map((item, idx) => (
-                <TouchableOpacity
-                  key={item.key}
-                  style={[
-                    ps.menuItem,
-                    idx < group.items.length - 1 && ps.menuItemBorder,
-                  ]}
-                  onPress={() => handleMenu(item.key)}
-                  activeOpacity={0.7}>
-                  <View style={ps.menuIconWrap}>
-                    <Text style={{ fontSize: 20 }}>{item.icon}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={ps.menuLabel}>{item.label}</Text>
-                    {item.sub ? <Text style={ps.menuSub}>{item.sub}</Text> : null}
-                  </View>
-                  <Text style={ps.menuArrow}>›</Text>
-                </TouchableOpacity>
-              ))}
+              {group.items.map((item, idx) => {
+                const Icon = item.icon;
+                return (
+                  <TouchableOpacity
+                    key={item.key}
+                    style={[
+                      ps.menuItem,
+                      idx < group.items.length - 1 && ps.menuItemBorder,
+                    ]}
+                    onPress={() => handleMenu(item.key)}
+                    activeOpacity={0.7}>
+                    <View style={ps.menuIconWrap}>
+                      <Icon size={20} color={COLORS.gray600} strokeWidth={1.8} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={ps.menuLabel}>{item.label}</Text>
+                      {item.sub ? <Text style={ps.menuSub}>{item.sub}</Text> : null}
+                    </View>
+                    <ChevronRight size={18} color={COLORS.gray400} strokeWidth={2} />
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         ))}
@@ -285,54 +299,54 @@ export default function ProfileScreen({ navigation }: any) {
 }
 
 const ps = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: COLORS.gray50 },
-  header:          { flexDirection: 'row', alignItems: 'center', gap: 14, padding: SPACING.lg, backgroundColor: COLORS.white },
+  container:       { flex: 1, backgroundColor: COLORS.black },
+  header:          { flexDirection: 'row', alignItems: 'center', gap: 14, padding: SPACING.lg, backgroundColor: COLORS.primary },
   avatarWrap:      { position: 'relative' },
-  avatar:          { width: 60, height: 60, borderRadius: 30, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
-  avatarTxt:       { fontSize: 22, fontWeight: FONT.black, color: '#fff' },
-  plusDot:         { position: 'absolute', bottom: 0, right: 0, width: 18, height: 18, backgroundColor: COLORS.primary, borderRadius: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: COLORS.white },
-  userName:        { fontSize: 18, fontWeight: FONT.black, color: COLORS.gray800 },
-  userSub:         { fontSize: 12, color: COLORS.gray400, marginTop: 2 },
-  sellerBadge:     { alignSelf: 'flex-start', backgroundColor: COLORS.amberLight, borderRadius: RADIUS.full, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4 },
+  avatar:          { width: 60, height: 60, borderRadius: 30, backgroundColor: COLORS.white, alignItems: 'center', justifyContent: 'center' },
+  avatarTxt:       { fontSize: 22, fontWeight: FONT.black, color: COLORS.primary },
+  plusDot:         { position: 'absolute', bottom: 0, right: 0, width: 18, height: 18, backgroundColor: COLORS.white, borderRadius: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: COLORS.primary },
+  userName:        { fontSize: 18, fontWeight: FONT.black, color: COLORS.white },
+  userSub:         { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
+  sellerBadge:     { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', backgroundColor: COLORS.white, borderRadius: RADIUS.full, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4 },
   sellerBadgeTxt:  { fontSize: 11, color: COLORS.amber, fontWeight: FONT.bold },
-  chatBtn:         { width: 40, height: 40, backgroundColor: COLORS.gray100, borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
-  loginBtn:        { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, marginHorizontal: SPACING.lg, marginBottom: SPACING.md, paddingVertical: 14, alignItems: 'center', ...SHADOW.strong },
+  chatBtn:         { width: 40, height: 40, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
+  loginBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, marginHorizontal: SPACING.lg, marginTop: SPACING.md, marginBottom: SPACING.md, paddingVertical: 14, ...SHADOW.strong },
   loginBtnTxt:     { color: COLORS.white, fontSize: 15, fontWeight: FONT.black },
-  logoutRow:       { flexDirection: 'row', gap: 10, marginHorizontal: SPACING.lg, marginBottom: SPACING.md },
-  sellerBtn:       { flex: 1, backgroundColor: COLORS.amberLight, borderRadius: RADIUS.lg, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: COLORS.amber },
+  logoutRow:       { flexDirection: 'row', gap: 10, marginHorizontal: SPACING.lg, marginTop: SPACING.md, marginBottom: SPACING.md },
+  sellerBtn:       { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: COLORS.amberLight, borderRadius: RADIUS.lg, paddingVertical: 12 },
   sellerBtnTxt:    { color: COLORS.amber, fontSize: 14, fontWeight: FONT.black },
-  logoutBtn:       { flex: 1, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, paddingVertical: 12, alignItems: 'center' },
-  logoutBtnTxt:    { color: COLORS.gray400, fontSize: 14, fontWeight: FONT.bold },
-  cashbackBanner:  { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: COLORS.primaryLight, margin: SPACING.lg, marginTop: SPACING.sm, borderRadius: RADIUS.xl, padding: SPACING.lg },
+  logoutBtn:       { flex: 1, backgroundColor: COLORS.blackSoft, borderRadius: RADIUS.lg, paddingVertical: 12, alignItems: 'center' },
+  logoutBtnTxt:    { color: COLORS.gray200, fontSize: 14, fontWeight: FONT.bold },
+  cashbackBanner:  { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: COLORS.primaryLight, marginHorizontal: SPACING.lg, marginBottom: SPACING.sm, borderRadius: RADIUS.xl, padding: SPACING.lg },
   cashbackRow:     { flexDirection: 'row', alignItems: 'baseline', marginBottom: 4 },
   cashbackAmount:  { fontSize: 24, fontWeight: FONT.black, color: COLORS.primaryDark },
   cashbackOf:      { fontSize: 14, color: COLORS.primary, fontWeight: FONT.semibold },
   cashbackLabel:   { fontSize: 12, color: COLORS.primaryDark, fontWeight: FONT.bold, marginBottom: 8 },
-  progressBg:      { height: 6, backgroundColor: 'rgba(232,66,10,0.15)', borderRadius: 3, marginBottom: 6 },
+  progressBg:      { height: 6, backgroundColor: 'rgba(154,28,28,0.15)', borderRadius: 3, marginBottom: 6 },
   progressFill:    { height: 6, backgroundColor: COLORS.primary, borderRadius: 3 },
   cashbackSub:     { fontSize: 11, color: COLORS.primary, fontWeight: FONT.semibold },
-  recentCard:      { backgroundColor: COLORS.white, marginHorizontal: SPACING.lg, marginBottom: SPACING.sm, borderRadius: RADIUS.xl, padding: SPACING.lg },
+  cashbackIconWrap:{ width: 56, height: 56, borderRadius: RADIUS.full, backgroundColor: COLORS.white, alignItems: 'center', justifyContent: 'center' },
+  recentCard:      { backgroundColor: COLORS.white, marginHorizontal: SPACING.lg, marginBottom: SPACING.sm, borderRadius: RADIUS.xl, padding: SPACING.lg, ...SHADOW.card },
   recentHeader:    { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
   recentTitle:     { fontSize: 15, fontWeight: FONT.black, color: COLORS.gray800 },
   recentLink:      { fontSize: 13, color: COLORS.primary, fontWeight: FONT.bold },
   recentRow:       { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  recentImg:       { width: 52, height: 52, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
+  recentImg:       { width: 52, height: 52, borderRadius: RADIUS.md, backgroundColor: COLORS.gray100, alignItems: 'center', justifyContent: 'center' },
   recentName:      { fontSize: 14, fontWeight: FONT.bold, color: COLORS.gray800, marginBottom: 3 },
   recentDate:      { fontSize: 12, color: COLORS.gray400, marginBottom: 6 },
   statusPill:      { alignSelf: 'flex-start', borderRadius: RADIUS.full, paddingHorizontal: 8, paddingVertical: 3 },
   statusTxt:       { fontSize: 11, fontWeight: FONT.bold },
   recentTotal:     { fontSize: 16, fontWeight: FONT.black, color: COLORS.gray800 },
-  statsWrap:       { flexDirection: 'row', backgroundColor: COLORS.white, marginBottom: 4 },
+  statsWrap:       { flexDirection: 'row', backgroundColor: COLORS.white, marginHorizontal: SPACING.lg, marginBottom: SPACING.md, borderRadius: RADIUS.lg, ...SHADOW.card },
   stat:            { flex: 1, alignItems: 'center', paddingVertical: 16 },
   statVal:         { fontSize: 20, fontWeight: FONT.black, color: COLORS.primary },
   statLbl:         { fontSize: 11, color: COLORS.gray400, marginTop: 2 },
-  group:           { marginBottom: 4 },
+  group:           { marginBottom: SPACING.sm },
   groupLabel:      { fontSize: 12, fontWeight: FONT.bold, color: COLORS.gray400, paddingHorizontal: SPACING.lg, paddingVertical: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  groupCard:       { backgroundColor: COLORS.white },
+  groupCard:       { backgroundColor: COLORS.white, marginHorizontal: SPACING.lg, borderRadius: RADIUS.lg, overflow: 'hidden', ...SHADOW.card },
   menuItem:        { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: SPACING.lg, paddingVertical: 14 },
   menuItemBorder:  { borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
   menuIconWrap:    { width: 32, alignItems: 'center' },
   menuLabel:       { fontSize: 15, color: COLORS.gray800, fontWeight: FONT.semibold },
   menuSub:         { fontSize: 12, color: COLORS.gray400, marginTop: 1 },
-  menuArrow:       { fontSize: 18, color: COLORS.gray400 },
 });

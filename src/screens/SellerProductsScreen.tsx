@@ -3,9 +3,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert, Image,
-  RefreshControl, Switch,
+  RefreshControl, Switch, StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  ChevronLeft, Plus, Package, Check, Star, Pencil, Trash2,
+} from 'lucide-react-native';
 import { COLORS, SPACING, RADIUS, FONT, SHADOW } from '../theme';
 import { supabase } from '../lib/supabase';
 
@@ -114,15 +117,17 @@ export default function SellerProductsScreen({ route, navigation }: any) {
 
   return (
     <View style={[sp.container, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       <View style={sp.header}>
         <TouchableOpacity style={sp.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={sp.backTxt}>‹</Text>
+          <ChevronLeft size={22} color={COLORS.white} strokeWidth={2.5} />
         </TouchableOpacity>
         <Text style={sp.headerTitle}>Mis productos</Text>
         <TouchableOpacity
           style={sp.addBtn}
           onPress={() => navigation.navigate('SellerAddProduct', { sellerId })}>
-          <Text style={sp.addBtnTxt}>+ Nuevo</Text>
+          <Plus size={14} color={COLORS.primary} strokeWidth={2.5} />
+          <Text style={sp.addBtnTxt}>Nuevo</Text>
         </TouchableOpacity>
       </View>
 
@@ -149,7 +154,9 @@ export default function SellerProductsScreen({ route, navigation }: any) {
         </View>
       ) : filtered.length === 0 ? (
         <View style={sp.empty}>
-          <Text style={{ fontSize: 48, marginBottom: 12 }}>📦</Text>
+          <View style={sp.emptyIconWrap}>
+            <Package size={40} color={COLORS.gray400} strokeWidth={1.5} />
+          </View>
           <Text style={sp.emptyTitle}>
             {products.length === 0 ? 'Aún no tienes productos' : 'Sin productos en este filtro'}
           </Text>
@@ -166,16 +173,16 @@ export default function SellerProductsScreen({ route, navigation }: any) {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ padding: SPACING.lg, paddingBottom: 40 }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} tintColor={COLORS.primary} />
           }>
           {filtered.map(product => (
             <View key={product.id} style={sp.productCard}>
               {/* Imagen */}
-              <View style={sp.productImg}>
+              <View style={[sp.productImg, { backgroundColor: product.image_url ? COLORS.gray200 : COLORS.gray100 }]}>
                 {product.image_url ? (
                   <Image source={{ uri: product.image_url }} style={sp.productImgReal} />
                 ) : (
-                  <Text style={{ fontSize: 32 }}>📦</Text>
+                  <Package size={28} color={COLORS.gray400} strokeWidth={1.5} />
                 )}
               </View>
 
@@ -189,12 +196,21 @@ export default function SellerProductsScreen({ route, navigation }: any) {
                   )}
                 </View>
                 <View style={sp.productStats}>
-                  <Text style={[sp.stockTxt, product.stock <= 5 && { color: COLORS.red }]}>
-                    📦 Stock: {product.stock}
-                  </Text>
-                  <Text style={sp.soldTxt}>✅ Vendidos: {product.sold}</Text>
+                  <View style={sp.statRow}>
+                    <Package size={11} color={product.stock <= 5 ? COLORS.primary : COLORS.gray600} strokeWidth={2} />
+                    <Text style={[sp.stockTxt, product.stock <= 5 && { color: COLORS.primary }]}>
+                      Stock: {product.stock}
+                    </Text>
+                  </View>
+                  <View style={sp.statRow}>
+                    <Check size={11} color={COLORS.gray600} strokeWidth={2} />
+                    <Text style={sp.soldTxt}>Vendidos: {product.sold}</Text>
+                  </View>
                 </View>
-                <Text style={sp.ratingTxt}>⭐ {product.rating}</Text>
+                <View style={sp.statRow}>
+                  <Star size={11} color={COLORS.gold} fill={COLORS.gold} strokeWidth={0} />
+                  <Text style={sp.ratingTxt}>{product.rating}</Text>
+                </View>
               </View>
 
               {/* Acciones */}
@@ -209,12 +225,12 @@ export default function SellerProductsScreen({ route, navigation }: any) {
                 <TouchableOpacity
                   style={sp.editBtn}
                   onPress={() => navigation.navigate('SellerAddProduct', { sellerId, product })}>
-                  <Text style={{ fontSize: 16 }}>✏️</Text>
+                  <Pencil size={16} color={COLORS.gray600} strokeWidth={2} />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={sp.deleteBtn}
                   onPress={() => deleteProduct(product)}>
-                  <Text style={{ fontSize: 16 }}>🗑️</Text>
+                  <Trash2 size={16} color={COLORS.primary} strokeWidth={2} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -226,34 +242,35 @@ export default function SellerProductsScreen({ route, navigation }: any) {
 }
 
 const sp = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: COLORS.gray50 },
-  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14, backgroundColor: COLORS.white, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
-  backBtn:         { width: 36, height: 36, backgroundColor: COLORS.gray100, borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
-  backTxt:         { fontSize: 24, color: COLORS.gray800, fontWeight: FONT.bold, lineHeight: 28 },
-  headerTitle:     { fontSize: 17, fontWeight: FONT.black, color: COLORS.gray800 },
-  addBtn:          { backgroundColor: COLORS.primary, borderRadius: RADIUS.full, paddingHorizontal: 14, paddingVertical: 7 },
-  addBtnTxt:       { color: COLORS.white, fontWeight: FONT.bold, fontSize: 13 },
-  filterWrap:      { backgroundColor: COLORS.white, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
-  filterBtn:       { backgroundColor: COLORS.gray100, borderRadius: RADIUS.full, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: 'transparent' },
+  container:       { flex: 1, backgroundColor: COLORS.black },
+  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14, backgroundColor: COLORS.primary },
+  backBtn:         { width: 36, height: 36, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
+  headerTitle:     { fontSize: 17, fontWeight: FONT.black, color: COLORS.white },
+  addBtn:          { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.white, borderRadius: RADIUS.full, paddingHorizontal: 14, paddingVertical: 7 },
+  addBtnTxt:       { color: COLORS.primary, fontWeight: FONT.bold, fontSize: 13 },
+  filterWrap:      { backgroundColor: COLORS.black, paddingVertical: 10 },
+  filterBtn:       { backgroundColor: COLORS.white, borderRadius: RADIUS.full, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: 'transparent' },
   filterBtnActive: { backgroundColor: COLORS.primaryLight, borderColor: COLORS.primary },
   filterTxt:       { fontSize: 13, fontWeight: FONT.semibold, color: COLORS.gray600 },
   filterTxtActive: { color: COLORS.primary, fontWeight: FONT.bold },
   empty:           { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-  emptyTitle:      { fontSize: 16, fontWeight: FONT.black, color: COLORS.gray800, textAlign: 'center', marginBottom: 16 },
+  emptyIconWrap:   { width: 80, height: 80, borderRadius: RADIUS.full, backgroundColor: COLORS.blackSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  emptyTitle:      { fontSize: 16, fontWeight: FONT.black, color: COLORS.white, textAlign: 'center', marginBottom: 16 },
   emptyBtn:        { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingHorizontal: 24, paddingVertical: 12 },
   emptyBtnTxt:     { color: COLORS.white, fontWeight: FONT.black },
-  productCard:     { flexDirection: 'row', gap: 12, backgroundColor: COLORS.white, borderRadius: RADIUS.lg, padding: SPACING.md, marginBottom: SPACING.sm, borderWidth: 0.5, borderColor: COLORS.border, alignItems: 'flex-start', ...SHADOW.card },
-  productImg:      { width: 72, height: 72, borderRadius: RADIUS.md, backgroundColor: COLORS.gray100, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  productImgReal:  { width: 72, height: 72, borderRadius: RADIUS.md },
+  productCard:     { flexDirection: 'row', gap: 12, backgroundColor: COLORS.white, borderRadius: RADIUS.lg, padding: SPACING.md, marginBottom: SPACING.sm, alignItems: 'flex-start', ...SHADOW.card },
+  productImg:      { width: 72, height: 72, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' },
+  productImgReal:  { width: 72, height: 72 },
   productInfo:     { flex: 1 },
   productName:     { fontSize: 13, fontWeight: FONT.bold, color: COLORS.gray800, lineHeight: 18, marginBottom: 4 },
   productPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 4 },
   productPrice:    { fontSize: 15, fontWeight: FONT.black, color: COLORS.primary },
   productOldPrice: { fontSize: 11, color: COLORS.gray400, textDecorationLine: 'line-through' },
-  productStats:    { flexDirection: 'row', gap: 12, marginBottom: 2 },
+  productStats:    { flexDirection: 'row', gap: 12, marginBottom: 4 },
+  statRow:         { flexDirection: 'row', alignItems: 'center', gap: 4 },
   stockTxt:        { fontSize: 11, color: COLORS.gray600, fontWeight: FONT.semibold },
   soldTxt:         { fontSize: 11, color: COLORS.gray600, fontWeight: FONT.semibold },
-  ratingTxt:       { fontSize: 11, color: '#F5A623', fontWeight: FONT.bold },
+  ratingTxt:       { fontSize: 11, color: COLORS.gray600, fontWeight: FONT.bold },
   productActions:  { alignItems: 'center', gap: 6 },
   editBtn:         { padding: 6 },
   deleteBtn:       { padding: 6 },

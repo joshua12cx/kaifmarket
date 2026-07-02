@@ -2,9 +2,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Image, ActivityIndicator, RefreshControl,
+  StyleSheet, Image, ActivityIndicator, RefreshControl, StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  Heart, Star, ShoppingCart, Store, Trash2, Package,
+} from 'lucide-react-native';
 import { COLORS, SPACING, RADIUS, FONT, SHADOW } from '../theme';
 import { PRODUCTS, SELLERS } from '../data';
 import { useFavs, useCart, useAuth } from '../context';
@@ -24,7 +27,6 @@ export default function FavoritesScreen({ navigation }: any) {
   // ── Cargar productos y vendedores de Supabase ─────────────────
   const fetchData = useCallback(async () => {
     try {
-      // 1. Productos favoritos de Supabase
       const stringIds = Object.keys(favs).filter(id =>
         favs[id] && isNaN(Number(id))
       );
@@ -41,7 +43,6 @@ export default function FavoritesScreen({ navigation }: any) {
         }
       }
 
-      // 2. Vendedores de Supabase
       const { data: sellersData } = await supabase
         .from('sellers')
         .select('*')
@@ -75,7 +76,7 @@ export default function FavoritesScreen({ navigation }: any) {
       if (!raw) { return null; }
       return {
         ...raw,
-        bgColor: raw.bgColor || raw.bg_color || '#F5F5F5',
+        bgColor: raw.bgColor || raw.bg_color || COLORS.gray100,
         oldPrice: raw.oldPrice || raw.old_price || null,
         imageUrl: raw.image_url || null,
         emoji: raw.emoji || '📦',
@@ -100,17 +101,18 @@ export default function FavoritesScreen({ navigation }: any) {
     const disc = product.oldPrice
       ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100)
       : null;
+    const isFavd = !!favs[String(product.id)];
 
     return (
       <TouchableOpacity
         style={fs.card}
         onPress={() => navigation.navigate('ProductDetail', { productId: product.id })}
         activeOpacity={0.9}>
-        <View style={[fs.cardImg, { backgroundColor: product.bgColor }]}>
+        <View style={[fs.cardImg, { backgroundColor: product.imageUrl ? COLORS.gray200 : product.bgColor }]}>
           {product.imageUrl ? (
             <Image source={{ uri: product.imageUrl }} style={fs.cardImgReal} resizeMode="cover" />
           ) : (
-            <Text style={{ fontSize: 52 }}>{product.emoji}</Text>
+            <Package size={40} color={COLORS.gray400} strokeWidth={1.5} />
           )}
           {disc && (
             <View style={fs.discBadge}>
@@ -118,7 +120,12 @@ export default function FavoritesScreen({ navigation }: any) {
             </View>
           )}
           <TouchableOpacity style={fs.favBtn} onPress={() => toggle(product.id)}>
-            <Text style={{ fontSize: 18 }}>{favs[String(product.id)] ? '❤️' : '🤍'}</Text>
+            <Heart
+              size={15}
+              color={isFavd ? COLORS.primary : COLORS.white}
+              fill={isFavd ? COLORS.primary : 'transparent'}
+              strokeWidth={2}
+            />
           </TouchableOpacity>
         </View>
         <View style={fs.cardInfo}>
@@ -127,11 +134,15 @@ export default function FavoritesScreen({ navigation }: any) {
             {product.oldPrice && <Text style={fs.oldPrice}>S/ {product.oldPrice}</Text>}
           </View>
           <Text style={fs.name} numberOfLines={2}>{product.name}</Text>
-          <Text style={fs.stars}>★ {product.rating || 5} ({product.reviews || 0})</Text>
+          <View style={fs.ratingRow}>
+            <Star size={11} color={COLORS.gold} fill={COLORS.gold} strokeWidth={0} />
+            <Text style={fs.stars}>{product.rating || 5} ({product.reviews || 0})</Text>
+          </View>
           <TouchableOpacity
             style={fs.addBtn}
             onPress={() => dispatch({ type: 'ADD', id: product.id })}>
-            <Text style={fs.addBtnTxt}>🛒 Al carrito</Text>
+            <ShoppingCart size={13} color={COLORS.black} strokeWidth={2} />
+            <Text style={fs.addBtnTxt}>Al carrito</Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -140,6 +151,7 @@ export default function FavoritesScreen({ navigation }: any) {
 
   return (
     <View style={[fs.container, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       <View style={fs.header}>
         <Text style={fs.headerTitle}>Favoritos</Text>
         {favCount > 0 && (
@@ -159,16 +171,19 @@ export default function FavoritesScreen({ navigation }: any) {
               refreshing={refreshing}
               onRefresh={onRefresh}
               colors={[COLORS.primary]}
+              tintColor={COLORS.primary}
             />
           }>
 
           {/* ── VACÍO ── */}
           {favProducts.length === 0 && (
             <View style={fs.emptySection}>
-              <Text style={fs.emptyEmoji}>❤️</Text>
+              <View style={fs.emptyIconWrap}>
+                <Heart size={40} color={COLORS.gray400} strokeWidth={1.5} />
+              </View>
               <Text style={fs.emptyTitle}>En favoritos aún no hay nada</Text>
               <Text style={fs.emptySub}>
-                Toca el ❤️ en cualquier producto para guardarlo aquí
+                Toca el corazón en cualquier producto para guardarlo aquí
               </Text>
               <TouchableOpacity
                 style={fs.emptyBtn}
@@ -183,12 +198,13 @@ export default function FavoritesScreen({ navigation }: any) {
             <View style={fs.section}>
               <View style={fs.sectionHeader}>
                 <Text style={fs.sectionTitle}>Mis favoritos</Text>
-                <TouchableOpacity onPress={() => {
-                  Object.keys(favs).filter(id => favs[id]).forEach(id => toggle(id));
-                }}>
-                  <Text style={{ fontSize: 13, color: COLORS.red, fontWeight: FONT.bold }}>
-                    Limpiar
-                  </Text>
+                <TouchableOpacity
+                  style={fs.clearBtn}
+                  onPress={() => {
+                    Object.keys(favs).filter(id => favs[id]).forEach(id => toggle(id));
+                  }}>
+                  <Trash2 size={13} color={COLORS.primary} strokeWidth={2} />
+                  <Text style={fs.clearTxt}>Limpiar</Text>
                 </TouchableOpacity>
               </View>
               <ScrollView
@@ -226,7 +242,7 @@ export default function FavoritesScreen({ navigation }: any) {
                     />
                   ) : (
                     <View style={fs.sellerAvatar}>
-                      <Text style={{ fontSize: 22 }}>🏪</Text>
+                      <Store size={22} color={COLORS.primary} strokeWidth={1.8} />
                     </View>
                   )}
                   <Text style={fs.sellerName} numberOfLines={1}>{seller.name}</Text>
@@ -246,7 +262,7 @@ export default function FavoritesScreen({ navigation }: any) {
                     key={product.id}
                     product={{
                       ...product,
-                      bgColor: product.bgColor || '#F5F5F5',
+                      bgColor: product.bgColor || COLORS.gray100,
                       oldPrice: product.oldPrice || null,
                       imageUrl: null,
                       emoji: product.emoji || '📦',
@@ -266,38 +282,41 @@ export default function FavoritesScreen({ navigation }: any) {
 }
 
 const fs = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.gray50 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14, backgroundColor: COLORS.white, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
-  headerTitle: { fontSize: 20, fontWeight: FONT.black, color: COLORS.gray800 },
-  headerCount: { fontSize: 14, color: COLORS.gray400, fontWeight: FONT.semibold },
+  container: { flex: 1, backgroundColor: COLORS.black },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14, backgroundColor: COLORS.primary },
+  headerTitle: { fontSize: 20, fontWeight: FONT.black, color: COLORS.white },
+  headerCount: { fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: FONT.semibold },
   emptySection: { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 40 },
-  emptyEmoji: { fontSize: 72, marginBottom: 16 },
-  emptyTitle: { fontSize: 18, fontWeight: FONT.black, color: COLORS.gray800, textAlign: 'center', marginBottom: 8 },
+  emptyIconWrap: { width: 80, height: 80, borderRadius: RADIUS.full, backgroundColor: COLORS.blackSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  emptyTitle: { fontSize: 18, fontWeight: FONT.black, color: COLORS.white, textAlign: 'center', marginBottom: 8 },
   emptySub: { fontSize: 14, color: COLORS.gray400, textAlign: 'center', marginBottom: 24 },
   emptyBtn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingHorizontal: 28, paddingVertical: 12 },
   emptyBtnTxt: { color: '#fff', fontWeight: FONT.black, fontSize: 14 },
   section: { padding: SPACING.lg, paddingBottom: SPACING.sm },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  sectionTitle: { fontSize: 16, fontWeight: FONT.black, color: COLORS.gray800, marginBottom: 4 },
+  sectionTitle: { fontSize: 16, fontWeight: FONT.black, color: COLORS.white, marginBottom: 4 },
   sectionSub: { fontSize: 12, color: COLORS.gray400 },
+  clearBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  clearTxt: { fontSize: 13, color: COLORS.primaryMid, fontWeight: FONT.bold },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  card: { width: 160, backgroundColor: COLORS.white, borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 0.5, borderColor: COLORS.border, ...SHADOW.card },
+  card: { width: 160, backgroundColor: COLORS.white, borderRadius: RADIUS.lg, overflow: 'hidden', ...SHADOW.card },
   cardImg: { height: 130, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   cardImgReal: { width: '100%', height: '100%', position: 'absolute' },
   discBadge: { position: 'absolute', top: 8, left: 8, backgroundColor: COLORS.red, borderRadius: RADIUS.sm, paddingHorizontal: 6, paddingVertical: 2 },
   discTxt: { color: '#fff', fontSize: 10, fontWeight: FONT.black },
-  favBtn: { position: 'absolute', top: 6, right: 8, padding: 4 },
+  favBtn: { position: 'absolute', top: 6, right: 6, width: 26, height: 26, borderRadius: RADIUS.full, backgroundColor: 'rgba(0,0,0,0.28)', alignItems: 'center', justifyContent: 'center' },
   cardInfo: { padding: SPACING.sm },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 3 },
   price: { fontSize: 16, fontWeight: FONT.black, color: COLORS.gray800 },
   oldPrice: { fontSize: 11, color: COLORS.gray400, textDecorationLine: 'line-through' },
   name: { fontSize: 12, color: COLORS.gray600, lineHeight: 16, marginBottom: 4 },
-  stars: { fontSize: 11, color: '#F5A623', marginBottom: 6 },
-  addBtn: { backgroundColor: '#FFD700', borderRadius: RADIUS.md, paddingVertical: 7, alignItems: 'center' },
-  addBtnTxt: { fontSize: 12, fontWeight: FONT.black, color: COLORS.gray800 },
-  sellerCard: { width: 110, backgroundColor: COLORS.white, borderRadius: RADIUS.lg, borderWidth: 0.5, borderColor: COLORS.border, padding: SPACING.md, alignItems: 'center', ...SHADOW.card },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 8 },
+  stars: { fontSize: 11, color: COLORS.gray600, fontWeight: FONT.semibold },
+  addBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: COLORS.gold, borderRadius: RADIUS.md, paddingVertical: 7 },
+  addBtnTxt: { fontSize: 12, fontWeight: FONT.black, color: COLORS.black },
+  sellerCard: { width: 110, backgroundColor: COLORS.white, borderRadius: RADIUS.lg, padding: SPACING.md, alignItems: 'center', ...SHADOW.card },
   sellerAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: COLORS.primaryLight, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
   sellerLogoImg: { width: 52, height: 52, borderRadius: 26, marginBottom: 6 },
   sellerName: { fontSize: 11, fontWeight: FONT.bold, color: COLORS.gray800, textAlign: 'center', marginBottom: 4 },
-  sellerDisc: { fontSize: 12, fontWeight: FONT.black, color: COLORS.red },
+  sellerDisc: { fontSize: 12, fontWeight: FONT.black, color: COLORS.primary },
 });

@@ -78,7 +78,7 @@ interface AuthContextType {
   isSeller: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<{ error?: string }>;
-  register: (data: RegisterData) => Promise<{ error?: string }>;
+  register: (data: RegisterData) => Promise<{ error?: string; wantsSeller?: boolean }>;
   logout: () => Promise<void>;
   activatePlus: () => void;
   updateUser: (data: Partial<AuthUser>) => void;
@@ -147,6 +147,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // ── Registro — SOLO crea usuario + rol buyer ──────────────────
+  // La tienda (sellers) se crea únicamente en SellerRegisterScreen,
+  // donde se exige DNI/RUC + documento. Aquí solo guardamos la
+  // "intención" de vender (is_seller) para guiar al usuario después.
   const register = async (data: RegisterData) => {
     try {
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -168,6 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ? data.name.trim().split(' ').map((w: string) => w[0]).join('').substring(0, 2).toUpperCase()
         : 'KM';
 
+      // 1. Crear perfil de usuario
       await supabase.from('users').insert({
         id: authData.user.id,
         email: data.email.trim().toLowerCase(),
@@ -176,11 +181,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         gender: data.gender || null,
         phone: data.phone || null,
         is_plus: false,
-        is_seller: data.isSeller || false,
+        is_seller: data.isSeller || false, // "quiere vender" — guía la UI después del login
         location: 'Lima, Perú',
       });
 
-      // Vincular pedidos de invitado
+      // 2. Rol "buyer" aprobado siempre
+      await supabase.from('user_roles').upsert({
+        user_id: authData.user.id,
+        role:    'buyer',
+        status:  'approved',
+      });
+
+      // 3. Vincular pedidos de invitado
       const { data: guestOrders } = await supabase
         .from('orders').select('id')
         .eq('buyer_email', data.email.trim().toLowerCase())
@@ -193,20 +205,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .is('buyer_id', null);
       }
 
-      if (data.isSeller) {
-        await supabase.from('sellers').insert({
-          user_id: authData.user.id,
-          name: data.name || 'Mi Tienda',
-          is_premium: false,
-          is_verified: false,
-          rating: 5.0,
-          total_sales: 0,
-          followers: 0,
-          location: 'Lima, Perú',
-        });
-      }
+      // NOTA: ya NO se crea la fila en `sellers` aquí.
+      // Si data.isSeller === true, el usuario deberá completar
+      // SellerRegisterScreen (DNI/RUC + documento) después de
+      // iniciar sesión para que su tienda quede "pending".
 
-      return {};
+      return { wantsSeller: data.isSeller };
     } catch (e) {
       return { error: 'Error de conexión. Verifica tu internet.' };
     }
@@ -264,7 +268,6 @@ export function FavProvider({ children }: { children: React.ReactNode }) {
   const [favs, setFavs] = useState<Record<string, boolean>>({});
   const [userId, setUserId] = useState<string | null>(null);
 
-  // ── Cargar favoritos desde Supabase al iniciar sesión ─────────
   const loadFavs = async (uid: string) => {
     setUserId(uid);
     try {
@@ -284,15 +287,12 @@ export function FavProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // ── Limpiar favoritos al cerrar sesión ────────────────────────
   const clearFavs = () => {
     setFavs({});
     setUserId(null);
   };
 
-  // ── Toggle — requiere login ───────────────────────────────────
   const toggle = (id: string | number, onNeedLogin?: () => void) => {
-    // Si no hay usuario logueado → Alert
     if (!userId) {
       Alert.alert(
         '❤️ Guardar favorito',
@@ -311,7 +311,6 @@ export function FavProvider({ children }: { children: React.ReactNode }) {
     const key = String(id);
     const isAdding = !favs[key];
 
-    // Actualización optimista
     setFavs(prev => {
       const next = { ...prev };
       if (next[key]) { delete next[key]; }
@@ -319,7 +318,6 @@ export function FavProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
 
-    // Sincronizar con Supabase
     if (isAdding) {
       supabase.from('favorites').insert({
         user_id: userId,

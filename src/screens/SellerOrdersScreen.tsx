@@ -2,9 +2,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, ActivityIndicator, RefreshControl, Alert,
+  StyleSheet, ActivityIndicator, RefreshControl, Alert, StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  ChevronLeft, ShoppingBag, User, Phone, MapPin, CreditCard,
+  Package, Truck, CheckCircle2, XCircle, Info, Wallet, Smartphone,
+} from 'lucide-react-native';
 import { COLORS, SPACING, RADIUS, FONT, SHADOW } from '../theme';
 import { supabase } from '../lib/supabase';
 
@@ -21,8 +25,19 @@ const statusColor = (s: string) => ({
   processing: { bg: COLORS.amberLight, txt: COLORS.amber },
   shipped:    { bg: COLORS.blueLight,  txt: COLORS.blue  },
   delivered:  { bg: COLORS.greenLight, txt: COLORS.green },
-  cancelled:  { bg: '#FFE5E5',         txt: COLORS.red   },
+  cancelled:  { bg: COLORS.redLight,   txt: COLORS.primary },
 }[s] || { bg: COLORS.gray100, txt: COLORS.gray400 });
+
+const paymentMeta = (m: string) => ({
+  cash: { label: 'Efectivo', icon: Wallet },
+  yape: { label: 'Yape',     icon: Smartphone },
+  plin: { label: 'Plin',     icon: Smartphone },
+}[m] || { label: m, icon: CreditCard });
+
+const deliveryLabel = (d: string) => ({
+  express: 'Exprés',
+  pickup:  'Recojo',
+}[d] || 'Estándar');
 
 export default function SellerOrdersScreen({ route, navigation }: any) {
   const { sellerId } = route.params;
@@ -181,18 +196,19 @@ export default function SellerOrdersScreen({ route, navigation }: any) {
 
   return (
     <View style={[so.container, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
 
       {/* ── HEADER ── */}
       <View style={so.header}>
         <TouchableOpacity style={so.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={so.backTxt}>‹</Text>
+          <ChevronLeft size={22} color={COLORS.white} strokeWidth={2.5} />
         </TouchableOpacity>
         <Text style={so.headerTitle}>Mis Ventas</Text>
         <View style={{ width: 36 }} />
       </View>
 
       {loading ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.black }}>
           <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
       ) : (
@@ -203,7 +219,7 @@ export default function SellerOrdersScreen({ route, navigation }: any) {
               <Text style={so.summaryVal}>{orders.length}</Text>
               <Text style={so.summaryLbl}>Total pedidos</Text>
             </View>
-            <View style={so.summaryCard}>
+            <View style={[so.summaryCard, so.summaryCardMid]}>
               <Text style={[so.summaryVal, pendingOrders > 0 && { color: COLORS.amber }]}>
                 {pendingOrders}
               </Text>
@@ -219,8 +235,9 @@ export default function SellerOrdersScreen({ route, navigation }: any) {
 
           {/* ── NOTA DE STOCK ── */}
           <View style={so.stockNote}>
+            <Info size={14} color={COLORS.blue} strokeWidth={2} />
             <Text style={so.stockNoteTxt}>
-              ℹ️ El stock se descuenta automáticamente al marcar un pedido como <Text style={{ fontWeight: FONT.black }}>Entregado</Text>
+              El stock se descuenta automáticamente al marcar un pedido como <Text style={{ fontWeight: FONT.black }}>Entregado</Text>
             </Text>
           </View>
 
@@ -250,12 +267,15 @@ export default function SellerOrdersScreen({ route, navigation }: any) {
                 refreshing={refreshing}
                 onRefresh={onRefresh}
                 colors={[COLORS.primary]}
+                tintColor={COLORS.primary}
               />
             }>
 
             {filtered.length === 0 ? (
               <View style={so.empty}>
-                <Text style={{ fontSize: 52, marginBottom: 16 }}>🛍️</Text>
+                <View style={so.emptyIconWrap}>
+                  <ShoppingBag size={40} color={COLORS.gray400} strokeWidth={1.5} />
+                </View>
                 <Text style={so.emptyTitle}>
                   {orders.length === 0
                     ? 'Aún no tienes ventas'
@@ -271,6 +291,8 @@ export default function SellerOrdersScreen({ route, navigation }: any) {
               filtered.map(order => {
                 const sc        = statusColor(order.status);
                 const isUpdating = updating === order.id;
+                const pm        = paymentMeta(order.payment_method);
+                const PayIcon   = pm.icon;
                 return (
                   <View key={order.id} style={so.orderCard}>
 
@@ -296,12 +318,17 @@ export default function SellerOrdersScreen({ route, navigation }: any) {
 
                     {/* ── Comprador ── */}
                     <View style={so.buyerRow}>
-                      <Text style={{ fontSize: 16 }}>👤</Text>
+                      <View style={so.buyerIconWrap}>
+                        <User size={16} color={COLORS.primary} strokeWidth={2} />
+                      </View>
                       <View style={{ flex: 1 }}>
                         <Text style={so.buyerName}>{order.buyer_name || 'Cliente'}</Text>
                         <Text style={so.buyerEmail}>{order.buyer_email}</Text>
                         {order.buyer_phone && (
-                          <Text style={so.buyerPhone}>📞 {order.buyer_phone}</Text>
+                          <View style={so.buyerPhoneRow}>
+                            <Phone size={11} color={COLORS.gray400} strokeWidth={2} />
+                            <Text style={so.buyerPhone}>{order.buyer_phone}</Text>
+                          </View>
                         )}
                       </View>
                     </View>
@@ -309,7 +336,7 @@ export default function SellerOrdersScreen({ route, navigation }: any) {
                     {/* ── Dirección ── */}
                     {order.address && (
                       <View style={so.addressRow}>
-                        <Text style={{ fontSize: 14 }}>📍</Text>
+                        <MapPin size={14} color={COLORS.gray400} strokeWidth={2} />
                         <Text style={so.addressTxt}>{order.address}</Text>
                       </View>
                     )}
@@ -331,16 +358,14 @@ export default function SellerOrdersScreen({ route, navigation }: any) {
                     {/* ── Footer ── */}
                     <View style={so.orderFooter}>
                       <View>
-                        <Text style={so.paymentTxt}>
-                          💳 {order.payment_method === 'cash' ? 'Efectivo' :
-                              order.payment_method === 'yape' ? 'Yape'     :
-                              order.payment_method === 'plin' ? 'Plin'     :
-                              order.payment_method}
-                        </Text>
-                        <Text style={so.deliveryTxt}>
-                          📦 {order.delivery_type === 'express' ? 'Exprés'   :
-                              order.delivery_type === 'pickup'  ? 'Recojo'   : 'Estándar'}
-                        </Text>
+                        <View style={so.footerInfoRow}>
+                          <PayIcon size={13} color={COLORS.gray400} strokeWidth={2} />
+                          <Text style={so.paymentTxt}>{pm.label}</Text>
+                        </View>
+                        <View style={so.footerInfoRow}>
+                          <Package size={13} color={COLORS.gray400} strokeWidth={2} />
+                          <Text style={so.deliveryTxt}>{deliveryLabel(order.delivery_type)}</Text>
+                        </View>
                       </View>
                       <View style={{ alignItems: 'flex-end' }}>
                         <Text style={so.sellerTotalLbl}>Tu ingreso</Text>
@@ -361,8 +386,9 @@ export default function SellerOrdersScreen({ route, navigation }: any) {
                               <TouchableOpacity
                                 style={[so.actionBtn, { backgroundColor: COLORS.blueLight }]}
                                 onPress={() => updateStatus(order.id, 'shipped', order)}>
+                                <Truck size={14} color={COLORS.blue} strokeWidth={2} />
                                 <Text style={[so.actionBtnTxt, { color: COLORS.blue }]}>
-                                  📦 Marcar enviado
+                                  Marcar enviado
                                 </Text>
                               </TouchableOpacity>
                             )}
@@ -370,16 +396,18 @@ export default function SellerOrdersScreen({ route, navigation }: any) {
                               <TouchableOpacity
                                 style={[so.actionBtn, { backgroundColor: COLORS.greenLight }]}
                                 onPress={() => updateStatus(order.id, 'delivered', order)}>
+                                <CheckCircle2 size={14} color={COLORS.green} strokeWidth={2} />
                                 <Text style={[so.actionBtnTxt, { color: COLORS.green }]}>
-                                  ✅ Marcar entregado
+                                  Marcar entregado
                                 </Text>
                               </TouchableOpacity>
                             )}
                             <TouchableOpacity
-                              style={[so.actionBtn, { backgroundColor: '#FFE5E5' }]}
+                              style={[so.actionBtn, { backgroundColor: COLORS.redLight }]}
                               onPress={() => updateStatus(order.id, 'cancelled', order)}>
-                              <Text style={[so.actionBtnTxt, { color: COLORS.red }]}>
-                                ✕ Cancelar
+                              <XCircle size={14} color={COLORS.primary} strokeWidth={2} />
+                              <Text style={[so.actionBtnTxt, { color: COLORS.primary }]}>
+                                Cancelar
                               </Text>
                             </TouchableOpacity>
                           </>
@@ -398,36 +426,39 @@ export default function SellerOrdersScreen({ route, navigation }: any) {
 }
 
 const so = StyleSheet.create({
-  container:      { flex: 1, backgroundColor: COLORS.gray50 },
-  header:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14, backgroundColor: COLORS.white, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
-  backBtn:        { width: 36, height: 36, backgroundColor: COLORS.gray100, borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
-  backTxt:        { fontSize: 24, color: COLORS.gray800, fontWeight: FONT.bold, lineHeight: 28 },
-  headerTitle:    { fontSize: 17, fontWeight: FONT.black, color: COLORS.gray800 },
-  summaryRow:     { flexDirection: 'row', backgroundColor: COLORS.white, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
-  summaryCard:    { flex: 1, alignItems: 'center', paddingVertical: SPACING.md, borderRightWidth: 0.5, borderRightColor: COLORS.border },
+  container:      { flex: 1, backgroundColor: COLORS.black },
+  header:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14, backgroundColor: COLORS.primary },
+  backBtn:        { width: 36, height: 36, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
+  headerTitle:    { fontSize: 17, fontWeight: FONT.black, color: COLORS.white },
+  summaryRow:     { flexDirection: 'row', gap: 10, padding: SPACING.lg },
+  summaryCard:    { flex: 1, alignItems: 'center', paddingVertical: SPACING.md, backgroundColor: COLORS.white, borderRadius: RADIUS.lg, ...SHADOW.card },
+  summaryCardMid: {},
   summaryVal:     { fontSize: 20, fontWeight: FONT.black, color: COLORS.primary, marginBottom: 2 },
   summaryLbl:     { fontSize: 11, color: COLORS.gray400 },
-  stockNote:      { backgroundColor: COLORS.blueLight, paddingHorizontal: SPACING.lg, paddingVertical: 8 },
-  stockNoteTxt:   { fontSize: 12, color: COLORS.blue, lineHeight: 18 },
-  filtersRow:     { paddingHorizontal: SPACING.lg, paddingVertical: 10, gap: 8, backgroundColor: COLORS.white, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
-  filterBtn:      { paddingHorizontal: 14, paddingVertical: 6, borderRadius: RADIUS.full, borderWidth: 1.5, borderColor: COLORS.border },
+  stockNote:      { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: COLORS.blueLight, marginHorizontal: SPACING.lg, marginBottom: SPACING.md, borderRadius: RADIUS.md, paddingHorizontal: SPACING.md, paddingVertical: 8 },
+  stockNoteTxt:   { flex: 1, fontSize: 12, color: COLORS.blue, lineHeight: 18 },
+  filtersRow:     { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.md, gap: 8 },
+  filterBtn:      { paddingHorizontal: 14, paddingVertical: 6, borderRadius: RADIUS.full, backgroundColor: COLORS.white, borderWidth: 1.5, borderColor: 'transparent' },
   filterBtnActive:{ borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight },
-  filterTxt:      { fontSize: 12, fontWeight: FONT.semibold, color: COLORS.gray400 },
+  filterTxt:      { fontSize: 12, fontWeight: FONT.semibold, color: COLORS.gray600 },
   filterTxtActive:{ color: COLORS.primary, fontWeight: FONT.bold },
   empty:          { alignItems: 'center', paddingVertical: 60 },
-  emptyTitle:     { fontSize: 16, fontWeight: FONT.black, color: COLORS.gray800, marginBottom: 8 },
+  emptyIconWrap:  { width: 80, height: 80, borderRadius: RADIUS.full, backgroundColor: COLORS.blackSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  emptyTitle:     { fontSize: 16, fontWeight: FONT.black, color: COLORS.white, marginBottom: 8 },
   emptySub:       { fontSize: 13, color: COLORS.gray400, textAlign: 'center', lineHeight: 20 },
-  orderCard:      { backgroundColor: COLORS.white, borderRadius: RADIUS.xl, marginBottom: SPACING.md, borderWidth: 0.5, borderColor: COLORS.border, overflow: 'hidden', ...SHADOW.card },
+  orderCard:      { backgroundColor: COLORS.white, borderRadius: RADIUS.xl, marginBottom: SPACING.md, overflow: 'hidden', ...SHADOW.card },
   orderHeader:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: SPACING.md, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
   orderId:        { fontSize: 14, fontWeight: FONT.black, color: COLORS.gray800 },
   orderDate:      { fontSize: 11, color: COLORS.gray400, marginTop: 2 },
   statusBadge:    { borderRadius: RADIUS.full, paddingHorizontal: 10, paddingVertical: 4 },
   statusTxt:      { fontSize: 12, fontWeight: FONT.bold },
   buyerRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: SPACING.md, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
+  buyerIconWrap:  { width: 32, height: 32, borderRadius: RADIUS.full, backgroundColor: COLORS.primaryLight, alignItems: 'center', justifyContent: 'center' },
   buyerName:      { fontSize: 14, fontWeight: FONT.bold, color: COLORS.gray800 },
   buyerEmail:     { fontSize: 12, color: COLORS.gray400, marginTop: 2 },
-  buyerPhone:     { fontSize: 12, color: COLORS.gray400, marginTop: 2 },
-  addressRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingHorizontal: SPACING.md, paddingBottom: SPACING.sm },
+  buyerPhoneRow:  { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  buyerPhone:     { fontSize: 12, color: COLORS.gray400 },
+  addressRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingHorizontal: SPACING.md, paddingBottom: SPACING.sm, paddingTop: SPACING.sm },
   addressTxt:     { flex: 1, fontSize: 12, color: COLORS.gray600, lineHeight: 18 },
   itemsWrap:      { backgroundColor: COLORS.gray50, padding: SPACING.md },
   itemsTitle:     { fontSize: 12, fontWeight: FONT.bold, color: COLORS.gray600, marginBottom: 6 },
@@ -436,11 +467,12 @@ const so = StyleSheet.create({
   itemTxt:        { flex: 1, fontSize: 13, color: COLORS.gray600 },
   itemTotal:      { fontSize: 13, fontWeight: FONT.bold, color: COLORS.gray800 },
   orderFooter:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: SPACING.md, borderTopWidth: 0.5, borderTopColor: COLORS.border },
-  paymentTxt:     { fontSize: 12, color: COLORS.gray400, marginBottom: 3 },
+  footerInfoRow:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 },
+  paymentTxt:     { fontSize: 12, color: COLORS.gray400 },
   deliveryTxt:    { fontSize: 12, color: COLORS.gray400 },
   sellerTotalLbl: { fontSize: 11, color: COLORS.gray400, marginBottom: 2 },
   sellerTotalVal: { fontSize: 18, fontWeight: FONT.black, color: COLORS.primary },
   actionsRow:     { flexDirection: 'row', gap: 8, padding: SPACING.md, borderTopWidth: 0.5, borderTopColor: COLORS.border },
-  actionBtn:      { flex: 1, borderRadius: RADIUS.lg, paddingVertical: 10, alignItems: 'center' },
+  actionBtn:      { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: RADIUS.lg, paddingVertical: 10 },
   actionBtnTxt:   { fontSize: 13, fontWeight: FONT.black },
 });

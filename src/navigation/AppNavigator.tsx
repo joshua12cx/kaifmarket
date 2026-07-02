@@ -1,9 +1,14 @@
 // src/navigation/AppNavigator.tsx
-import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Home, Search, Tag, Heart, User } from 'lucide-react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import SplashScreen      from '../screens/SplashScreen';
+import OnboardingScreen  from '../screens/OnboardingScreen';
 
 import HomeScreen             from '../screens/HomeScreen';
 import ProductDetailScreen    from '../screens/ProductDetailScreen';
@@ -30,26 +35,26 @@ import { COLORS, RADIUS, FONT } from '../theme';
 import { useCart, useNotifs, useFavs, useAuth } from '../context';
 
 export type RootStackParamList = {
-  HomeMain:        undefined;
-  ProductDetail:   { productId: number | string };
-  Cart:            undefined;
-  Notifications:   undefined;
-  Profile:         undefined;
-  SearchMain:      undefined;
-  SellerStore:     { sellerId: string };
-  Favorites:       undefined;
-  Login:           undefined;
-  Register:        undefined;
-  Checkout:        undefined;
-  OrderSuccess:    { orderId: string; total: number; email: string; delivery: string; payment: string };
-  OrdersHistory:   undefined;
-  SellerDashboard: undefined;
-  SellerRegister:  undefined;
-  SellerAddProduct:{ sellerId: string; product?: any };
-  SellerProducts:  { sellerId: string };
-  SellerReviews:   { sellerId: string };
-  SellerOrders:    { sellerId: string };
-  SellerEditStore: { seller: any };
+  HomeMain:         undefined;
+  ProductDetail:    { productId: number | string };
+  Cart:             undefined;
+  Notifications:    undefined;
+  Profile:          undefined;
+  SearchMain:       undefined;
+  SellerStore:      { sellerId: string };
+  Favorites:        undefined;
+  Login:            undefined;
+  Register:         undefined;
+  Checkout:         undefined;
+  OrderSuccess:     { orderId: string; total: number; email: string; delivery: string; payment: string };
+  OrdersHistory:    undefined;
+  SellerDashboard:  undefined;
+  SellerRegister:   undefined;
+  SellerAddProduct: { sellerId: string; product?: any };
+  SellerProducts:   { sellerId: string };
+  SellerReviews:    { sellerId: string };
+  SellerOrders:     { sellerId: string };
+  SellerEditStore:  { seller: any };
 };
 
 export type TabParamList = {
@@ -131,11 +136,11 @@ function ProfileStack() {
 }
 
 const TABS = [
-  { name: 'HomeTab' as const,      icon: '🏠', label: 'Inicio'    },
-  { name: 'SearchTab' as const,    icon: '🔍', label: 'Buscar'    },
-  { name: 'OffersTab' as const,    icon: '🏷️', label: 'Ofertas'   },
-  { name: 'FavoritesTab' as const, icon: '❤️', label: 'Favoritos' },
-  { name: 'ProfileTab' as const,   icon: '👤', label: 'Perfil'    },
+  { name: 'HomeTab'      as const, Icon: Home,   label: 'Inicio'    },
+  { name: 'SearchTab'    as const, Icon: Search, label: 'Buscar'    },
+  { name: 'OffersTab'    as const, Icon: Tag,    label: 'Ofertas'   },
+  { name: 'FavoritesTab' as const, Icon: Heart,  label: 'Favoritos' },
+  { name: 'ProfileTab'   as const, Icon: User,   label: 'Perfil'    },
 ];
 
 function KaifTabBar({ state, navigation }: BottomTabBarProps) {
@@ -144,9 +149,9 @@ function KaifTabBar({ state, navigation }: BottomTabBarProps) {
   const { favCount }    = useFavs();
 
   const getBadge = (name: string) => {
-    if (name === 'HomeTab')      { return unreadCount; }
-    if (name === 'OffersTab')    { return totalItems;  }
-    if (name === 'FavoritesTab') { return favCount;    }
+    if (name === 'HomeTab')      return unreadCount;
+    if (name === 'OffersTab')    return totalItems;
+    if (name === 'FavoritesTab') return favCount;
     return 0;
   };
 
@@ -156,6 +161,7 @@ function KaifTabBar({ state, navigation }: BottomTabBarProps) {
         const tab     = TABS[index];
         const focused = state.index === index;
         const badge   = getBadge(route.name);
+        const Icon    = tab.Icon;
 
         return (
           <TouchableOpacity
@@ -165,7 +171,12 @@ function KaifTabBar({ state, navigation }: BottomTabBarProps) {
             activeOpacity={0.7}>
             <View style={tb.iconWrap}>
               <View style={[tb.iconBg, focused && tb.iconBgActive]}>
-                <Text style={[tb.icon, focused && tb.iconActive]}>{tab.icon}</Text>
+                <Icon
+                  size={20}
+                  color={focused ? COLORS.primary : COLORS.gray400}
+                  strokeWidth={2}
+                  fill={focused && tab.name === 'FavoritesTab' ? COLORS.primary : 'none'}
+                />
               </View>
               {badge > 0 && (
                 <View style={tb.badge}>
@@ -182,11 +193,13 @@ function KaifTabBar({ state, navigation }: BottomTabBarProps) {
 }
 
 // ── ROOT ──────────────────────────────────────────────────────────
+type AppState = 'splash' | 'onboarding' | 'main';
+
 export default function AppNavigator() {
   const { loading, user } = useAuth();
   const { loadFavs, clearFavs } = useFavs();
+  const [appState, setAppState] = useState<AppState>('splash');
 
-  // ── Cargar/limpiar favoritos según sesión ─────────────────────
   useEffect(() => {
     if (user?.id) {
       loadFavs(user.id);
@@ -195,16 +208,22 @@ export default function AppNavigator() {
     }
   }, [user?.id]);
 
-  if (loading) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.white }}>
-        <Text style={{ fontSize: 48, marginBottom: 16 }}>🐦</Text>
-        <Text style={{ fontSize: 20, fontWeight: FONT.black, color: COLORS.primary, marginBottom: 12 }}>
-          KaifMarket
-        </Text>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
+  const handleSplashDone = async () => {
+    const seen = await AsyncStorage.getItem('onboarding_done');
+    setAppState(seen ? 'main' : 'onboarding');
+  };
+
+  const handleOnboardingDone = async () => {
+    await AsyncStorage.setItem('onboarding_done', 'true');
+    setAppState('main');
+  };
+
+  if (loading || appState === 'splash') {
+    return <SplashScreen onFinish={handleSplashDone} />;
+  }
+
+  if (appState === 'onboarding') {
+    return <OnboardingScreen onFinish={handleOnboardingDone} />;
   }
 
   return (
@@ -228,8 +247,6 @@ const tb = StyleSheet.create({
   iconWrap:     { position: 'relative', alignItems: 'center' },
   iconBg:       { width: 40, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.full },
   iconBgActive: { backgroundColor: COLORS.primaryLight },
-  icon:         { fontSize: 20, opacity: 0.4 },
-  iconActive:   { opacity: 1 },
   label:        { fontSize: 10, fontWeight: FONT.semibold, color: COLORS.gray400 },
   labelActive:  { color: COLORS.primary, fontWeight: FONT.black },
   badge:        { position: 'absolute', top: -4, right: -8, backgroundColor: COLORS.primary, borderRadius: 9, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },

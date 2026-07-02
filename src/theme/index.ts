@@ -1,46 +1,45 @@
 // src/theme/index.ts
 // ═══════════════════════════════════════════════════
-//  KAIF MARKET — Tema Gallito de las Rocas 🇵🇪
-//  Colores: Naranja/Rojo + Negro + Gris
+//  KAIF MARKET — Tema "Rojo Marca" + base neutra
 // ═══════════════════════════════════════════════════
 
 export const COLORS = {
-  // ── PRIMARIOS — Naranja/Rojo del Gallito ──────────
-  primary:      '#E8420A',  // naranja-rojo principal
-  primaryDark:  '#B5300A',  // rojo oscuro
-  primaryLight: '#FFF0EB',  // naranja muy claro (fondos)
-  primaryMid:   '#FF6B35',  // naranja medio
+  // ── PRIMARIO — rojo vibrante de marca ─────────────
+  primary:      '#D32B2B',  // rojo vibrante (headers, CTAs)
+  primaryDark:  '#9A1C1C',  // granate oscuro (acentos fuertes)
+  primaryLight: '#FDECEC',  // fondo rojo muy claro (badges suaves)
+  primaryMid:   '#E8543F',  // acento secundario (tags, ofertas)
 
-  // ── NEGROS Y GRISES ───────────────────────────────
-  black:        '#1A1A1A',  // negro principal (textos)
-  blackSoft:    '#2D2D2D',  // negro suave (headers)
-  gray800:      '#1A1A1A',  // texto principal
-  gray600:      '#4A4A4A',  // texto secundario
-  gray400:      '#8A8A8A',  // texto muted
-  gray200:      '#D0D0D0',  // bordes
-  gray100:      '#F0F0F0',  // fondos de cards
-  gray50:       '#F7F7F7',  // fondo de pantallas
+  // ── NEUTROS — base dominante del contenido ────────
+  black:        '#18181B',
+  blackSoft:    '#27272A',
+  gray800:      '#27272A',
+  gray600:      '#52525B',
+  gray400:      '#A1A1AA',
+  gray200:      '#E4E4E7',
+  gray100:      '#F4F4F5',
+  gray50:       '#FAFAFA',
 
   // ── BLANCOS ───────────────────────────────────────
   white:        '#FFFFFF',
 
-  // ── ESTADOS ───────────────────────────────────────
-  green:        '#2D7A3A',  // éxito, envío gratis
-  greenLight:   '#E8F5EA',  // fondo verde
-  blue:         '#1A5FA5',  // info
-  blueLight:    '#E6F1FB',  // fondo azul
-  red:          '#CC1A1A',  // errores, descuentos
-  redLight:     '#FCEAEA',  // fondo rojo
-  amber:        '#B5720A',  // advertencias
-  amberLight:   '#FDF3E0',  // fondo ámbar
+  // ── ESTADOS ────────────────────────────────────────
+  green:        '#15803D',
+  greenLight:   '#F0FDF4',
+  blue:         '#1D4ED8',
+  blueLight:    '#EFF6FF',
+  red:          '#D32B2B',  // mismo que primary — descuentos
+  redLight:     '#FEF2F2',
+  amber:        '#A16207',
+  amberLight:   '#FFFBEB',
 
   // ── BORDES Y SOMBRAS ──────────────────────────────
-  border:       '#E0E0E0',
-  shadow:       '#E8420A',
+  border:       '#E4E4E7',
+  shadow:       '#000000',
 
-  // ── ACENTO DORADO (plumas del gallito) ────────────
-  gold:         '#FFB830',
-  goldLight:    '#FFF8E7',
+  // ── ACENTO DORADO — badge PLUS, ratings ────────────
+  gold:         '#E5A623',
+  goldLight:    '#FEF9EC',
 };
 
 export const SPACING = {
@@ -48,36 +47,36 @@ export const SPACING = {
 };
 
 export const RADIUS = {
-  sm: 6, md: 10, lg: 14, xl: 18, xxl: 24, full: 999,
+  sm: 4, md: 8, lg: 10, xl: 14, xxl: 18, full: 999,
 };
 
 export const FONT = {
   regular:  '400' as const,
-  semibold: '600' as const,
-  bold:     '700' as const,
-  black:    '800' as const,
+  semibold: '500' as const,
+  bold:     '600' as const,
+  black:    '700' as const,
 };
 
 export const SHADOW = {
   card: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
   },
   strong: {
-    shadowColor: '#E8420A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.10,
+    shadowRadius: 8,
+    elevation: 4,
   },
   header: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
 };

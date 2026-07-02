@@ -3,23 +3,30 @@ import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ScrollView, ActivityIndicator,
-  Alert, Image,
+  Alert, Image, StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchImageLibrary } from 'react-native-image-picker';
+import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
 import RNFS from 'react-native-fs';
+import {
+  ChevronLeft, Store, FileText, Info, ShieldCheck,
+} from 'lucide-react-native';
 import { COLORS, SPACING, RADIUS, FONT, SHADOW } from '../theme';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context';
+import { getCategoryIcon } from '../utils/categoryIcons';
 
 const CATEGORIES = [
-  { id: 'electro', label: 'Electrónica', emoji: '📱' },
-  { id: 'hogar',   label: 'Hogar',       emoji: '🛋️' },
-  { id: 'moda',    label: 'Moda',        emoji: '👟' },
-  { id: 'belleza', label: 'Belleza',     emoji: '💄' },
-  { id: 'deporte', label: 'Deporte',     emoji: '⚽' },
-  { id: 'otros',   label: 'Otros',       emoji: '🛍️' },
+  { id: 'electro', label: 'Electrónica' },
+  { id: 'hogar',   label: 'Hogar'       },
+  { id: 'moda',    label: 'Moda'        },
+  { id: 'belleza', label: 'Belleza'     },
+  { id: 'deporte', label: 'Deporte'     },
+  { id: 'otros',   label: 'Otros'       },
 ];
+
+const MAX_DOC_SIZE = 10 * 1024 * 1024; // 10 MB
 
 export default function SellerRegisterScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -32,7 +39,12 @@ export default function SellerRegisterScreen({ navigation }: any) {
   const [category,     setCategory]     = useState('');
   const [dniRuc,       setDniRuc]       = useState('');
   const [logoUri,      setLogoUri]      = useState<string | null>(null);
-  const [docUri,       setDocUri]       = useState<string | null>(null);
+
+  // ── Documento: puede ser imagen o PDF ─────────────────────────
+  const [docUri,    setDocUri]    = useState<string | null>(null);
+  const [docType,   setDocType]   = useState<string | null>(null); // 'image' | 'pdf'
+  const [docName,   setDocName]   = useState<string | null>(null);
+
   const [loading,      setLoading]      = useState(false);
   const [errors,       setErrors]       = useState<Record<string, string>>({});
 
@@ -44,16 +56,60 @@ export default function SellerRegisterScreen({ navigation }: any) {
     if (result.assets?.[0]?.uri) { setLogoUri(result.assets[0].uri); }
   };
 
-  // ── Seleccionar foto del documento (DNI/RUC) ──────────────────
-  const pickDocument = async () => {
-    const result = await launchImageLibrary({
-      mediaType: 'photo', quality: 0.8, maxWidth: 1200, maxHeight: 1200,
-    });
-    if (result.assets?.[0]?.uri) { setDocUri(result.assets[0].uri); }
+  // ── Seleccionar documento: foto o PDF ─────────────────────────
+  const pickDocument = () => {
+    Alert.alert('Subir documento', '¿Qué tipo de archivo quieres subir?', [
+      {
+        text: '📷 Foto (DNI)',
+        onPress: async () => {
+          const result = await launchImageLibrary({
+            mediaType: 'photo', quality: 0.8, maxWidth: 1600, maxHeight: 1600,
+          });
+          const asset = result.assets?.[0];
+          if (!asset?.uri) { return; }
+
+          if (asset.fileSize && asset.fileSize > MAX_DOC_SIZE) {
+            Alert.alert('Archivo muy grande', 'La imagen supera los 10MB. Elige otra.');
+            return;
+          }
+          setDocUri(asset.uri);
+          setDocType('image');
+          setDocName(asset.fileName || 'documento.jpg');
+          setErrors(e => ({ ...e, docUri: '' }));
+        },
+      },
+      {
+        text: '📄 Archivo PDF (RUC)',
+        onPress: async () => {
+          try {
+            const [result] = await pick({
+              type: [types.pdf],
+              copyTo: 'cachesDirectory',
+            });
+
+            if (result.size && result.size > MAX_DOC_SIZE) {
+              Alert.alert('Archivo muy grande', 'El PDF supera los 10MB. Elige otro.');
+              return;
+            }
+
+            const uri = result.uri;
+            setDocUri(uri);
+            setDocType('pdf');
+            setDocName(result.name || 'documento.pdf');
+            setErrors(e => ({ ...e, docUri: '' }));
+          } catch (e: any) {
+            if (isErrorWithCode(e) && e.code === errorCodes.OPERATION_CANCELED) { return; }
+            if (__DEV__) { console.log('[DOC_PICKER] Error:', e); }
+            Alert.alert('Error', 'No se pudo seleccionar el archivo.');
+          }
+        },
+      },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
   };
 
-  // ── Subir imagen a Supabase Storage con RNFS ──────────────────
-  const uploadImage = async (uri: string, prefix: string): Promise<string | null> => {
+  // ── Subir imagen (logo) a Supabase Storage ────────────────────
+  const uploadImageFile = async (uri: string, prefix: string, ext: string, contentType: string): Promise<string | null> => {
     try {
       const cleanUri = uri.replace('file://', '');
       const base64    = await RNFS.readFile(cleanUri, 'base64');
@@ -77,10 +133,10 @@ export default function SellerRegisterScreen({ navigation }: any) {
         if (i + 3 < len) { bytes[j++] = ((c & 3) << 6) | d; }
       }
 
-      const fileName = `${prefix}_${user?.id}_${Date.now()}.jpg`;
+      const fileName = `${prefix}_${user?.id}_${Date.now()}.${ext}`;
       const { error } = await supabase.storage
         .from('sellers')
-        .upload(fileName, bytes, { contentType: 'image/jpeg', upsert: true });
+        .upload(fileName, bytes, { contentType, upsert: true });
 
       if (error) {
         if (__DEV__) { console.log('[SELLER] Upload error:', error); }
@@ -103,7 +159,7 @@ export default function SellerRegisterScreen({ navigation }: any) {
     if (!category)           { errs.category    = 'Selecciona una categoría'; }
     if (!dniRuc.trim())      { errs.dniRuc      = 'El DNI o RUC es requerido'; }
     else if (dniRuc.trim().length < 8) { errs.dniRuc = 'Ingresa un DNI (8 dígitos) o RUC (11 dígitos) válido'; }
-    if (!docUri)             { errs.docUri      = 'Sube una foto de tu DNI o RUC'; }
+    if (!docUri)             { errs.docUri      = 'Sube una foto o PDF de tu DNI/RUC'; }
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -116,10 +172,14 @@ export default function SellerRegisterScreen({ navigation }: any) {
     setLoading(true);
     try {
       let logoUrl: string | null = null;
-      if (logoUri) { logoUrl = await uploadImage(logoUri, 'logo'); }
+      if (logoUri) { logoUrl = await uploadImageFile(logoUri, 'logo', 'jpg', 'image/jpeg'); }
 
       let documentUrl: string | null = null;
-      if (docUri) { documentUrl = await uploadImage(docUri, 'doc'); }
+      if (docUri && docType === 'pdf') {
+        documentUrl = await uploadImageFile(docUri, 'doc', 'pdf', 'application/pdf');
+      } else if (docUri) {
+        documentUrl = await uploadImageFile(docUri, 'doc', 'jpg', 'image/jpeg');
+      }
 
       if (!documentUrl) {
         Alert.alert('Error', 'No se pudo subir tu documento. Intenta de nuevo.');
@@ -130,21 +190,21 @@ export default function SellerRegisterScreen({ navigation }: any) {
       const { error } = await supabase
         .from('sellers')
         .insert({
-          user_id:     user.id,
-          name:        storeName.trim(),
-          description: description.trim(),
-          location:    location.trim(),
-          phone:       phone.trim() || null,
-          category:    category,
-          logo_url:    logoUrl,
-          dni_ruc:     dniRuc.trim(),
+          user_id:      user.id,
+          name:         storeName.trim(),
+          description:  description.trim(),
+          location:     location.trim(),
+          phone:        phone.trim() || null,
+          category:     category,
+          logo_url:     logoUrl,
+          dni_ruc:      dniRuc.trim(),
           document_url: documentUrl,
-          status:      'pending',
-          is_premium:  false,
-          is_verified: false,
-          rating:      5.0,
-          total_sales: 0,
-          followers:   0,
+          status:       'pending',
+          is_premium:   false,
+          is_verified:  false,
+          rating:       5.0,
+          total_sales:  0,
+          followers:    0,
         });
 
       if (error) {
@@ -154,12 +214,11 @@ export default function SellerRegisterScreen({ navigation }: any) {
         return;
       }
 
-      // El usuario YA es vendedor (puede ver su panel),
-      // pero su tienda está "pending" hasta revisión manual
-      await supabase
-        .from('users')
-        .update({ is_seller: true })
-        .eq('id', user.id);
+      // Marcar usuario como vendedor + crear/actualizar rol "seller" pendiente
+      await supabase.from('users').update({ is_seller: true }).eq('id', user.id);
+      await supabase.from('user_roles').upsert({
+        user_id: user.id, role: 'seller', status: 'pending',
+      });
 
       updateUser({ is_seller: true });
 
@@ -179,9 +238,10 @@ export default function SellerRegisterScreen({ navigation }: any) {
 
   return (
     <View style={[sr.container, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       <View style={sr.header}>
         <TouchableOpacity style={sr.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={sr.backTxt}>‹</Text>
+          <ChevronLeft size={22} color={COLORS.white} strokeWidth={2.5} />
         </TouchableOpacity>
         <Text style={sr.headerTitle}>Crear mi tienda</Text>
         <View style={{ width: 36 }} />
@@ -200,7 +260,7 @@ export default function SellerRegisterScreen({ navigation }: any) {
               <Image source={{ uri: logoUri }} style={sr.logoImg} />
             ) : (
               <View style={sr.logoPlaceholder}>
-                <Text style={{ fontSize: 36 }}>🏪</Text>
+                <Store size={32} color={COLORS.primary} strokeWidth={1.8} />
                 <Text style={sr.logoHint}>Toca para subir tu logo</Text>
               </View>
             )}
@@ -282,24 +342,31 @@ export default function SellerRegisterScreen({ navigation }: any) {
           <Text style={sr.cardTitle}>Categoría principal *</Text>
           {errors.category ? <Text style={sr.errorTxt}>{errors.category}</Text> : null}
           <View style={sr.catsGrid}>
-            {CATEGORIES.map(cat => (
-              <TouchableOpacity
-                key={cat.id}
-                style={[sr.catBtn, category === cat.id && sr.catBtnActive]}
-                onPress={() => { setCategory(cat.id); setErrors(e => ({ ...e, category: '' })); }}
-                activeOpacity={0.8}>
-                <Text style={{ fontSize: 24 }}>{cat.emoji}</Text>
-                <Text style={[sr.catLabel, category === cat.id && sr.catLabelActive]}>
-                  {cat.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {CATEGORIES.map(cat => {
+              const Icon = getCategoryIcon(cat.id);
+              const active = category === cat.id;
+              return (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[sr.catBtn, active && sr.catBtnActive]}
+                  onPress={() => { setCategory(cat.id); setErrors(e => ({ ...e, category: '' })); }}
+                  activeOpacity={0.8}>
+                  <Icon size={24} color={active ? COLORS.primary : COLORS.gray600} strokeWidth={1.8} />
+                  <Text style={[sr.catLabel, active && sr.catLabelActive]}>
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
         {/* ── VERIFICACIÓN DE IDENTIDAD ── */}
         <View style={sr.card}>
-          <Text style={sr.cardTitle}>Verificación de identidad</Text>
+          <View style={sr.cardTitleRow}>
+            <ShieldCheck size={16} color={COLORS.gray800} strokeWidth={2} />
+            <Text style={sr.cardTitle}>Verificación de identidad</Text>
+          </View>
           <Text style={sr.verifySub}>
             Necesitamos verificar tu identidad para aprobar tu tienda y mantener KaifMarket seguro.
           </Text>
@@ -321,23 +388,38 @@ export default function SellerRegisterScreen({ navigation }: any) {
           </View>
 
           <View style={sr.field}>
-            <Text style={sr.label}>Foto de tu DNI o RUC *</Text>
+            <Text style={sr.label}>Documento — foto o PDF *</Text>
+            <Text style={sr.docHelp}>
+              DNI: sube una foto clara. RUC: puedes subir la ficha SUNAT en PDF. Máx. 10MB.
+            </Text>
             <TouchableOpacity
               style={[sr.docWrap, errors.docUri && sr.inputError]}
               onPress={pickDocument}
               activeOpacity={0.8}>
               {docUri ? (
-                <>
-                  <Image source={{ uri: docUri }} style={sr.docImg} resizeMode="cover" />
-                  <View style={sr.docEditBadge}>
-                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: FONT.bold }}>Cambiar foto</Text>
+                docType === 'pdf' ? (
+                  <View style={sr.docFileRow}>
+                    <View style={sr.docFileIconWrap}>
+                      <FileText size={26} color={COLORS.primary} strokeWidth={1.8} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={sr.docFileName} numberOfLines={1}>{docName}</Text>
+                      <Text style={sr.docFileSub}>PDF cargado · Toca para cambiar</Text>
+                    </View>
                   </View>
-                </>
+                ) : (
+                  <>
+                    <Image source={{ uri: docUri }} style={sr.docImg} resizeMode="cover" />
+                    <View style={sr.docEditBadge}>
+                      <Text style={{ color: '#fff', fontSize: 11, fontWeight: FONT.bold }}>Cambiar archivo</Text>
+                    </View>
+                  </>
+                )
               ) : (
                 <View style={sr.docPlaceholder}>
-                  <Text style={{ fontSize: 32 }}>📄</Text>
-                  <Text style={sr.docHint}>Toca para subir foto de tu documento</Text>
-                  <Text style={sr.docHintSub}>Asegúrate que se vea claro y completo</Text>
+                  <FileText size={32} color={COLORS.gray400} strokeWidth={1.5} />
+                  <Text style={sr.docHint}>Toca para subir foto o PDF de tu documento</Text>
+                  <Text style={sr.docHintSub}>JPG, PNG o PDF — máx. 10MB</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -347,7 +429,7 @@ export default function SellerRegisterScreen({ navigation }: any) {
 
         {/* ── INFO ── */}
         <View style={sr.infoCard}>
-          <Text style={sr.infoIcon}>ℹ️</Text>
+          <Info size={20} color={COLORS.blue} strokeWidth={2} />
           <View style={{ flex: 1 }}>
             <Text style={sr.infoTitle}>¿Cómo funciona?</Text>
             <Text style={sr.infoTxt}>
@@ -382,13 +464,13 @@ export default function SellerRegisterScreen({ navigation }: any) {
 }
 
 const sr = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: COLORS.gray50 },
-  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14, backgroundColor: COLORS.white, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
-  backBtn:         { width: 36, height: 36, backgroundColor: COLORS.gray100, borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
-  backTxt:         { fontSize: 24, color: COLORS.gray800, fontWeight: FONT.bold, lineHeight: 28 },
-  headerTitle:     { fontSize: 17, fontWeight: FONT.black, color: COLORS.gray800 },
-  card:            { backgroundColor: COLORS.white, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.md, borderWidth: 0.5, borderColor: COLORS.border, ...SHADOW.card },
+  container:       { flex: 1, backgroundColor: COLORS.black },
+  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14, backgroundColor: COLORS.primary },
+  backBtn:         { width: 36, height: 36, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
+  headerTitle:     { fontSize: 17, fontWeight: FONT.black, color: COLORS.white },
+  card:            { backgroundColor: COLORS.white, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.md, ...SHADOW.card },
   cardTitle:       { fontSize: 15, fontWeight: FONT.black, color: COLORS.gray800, marginBottom: SPACING.md },
+  cardTitleRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: SPACING.sm },
   logoWrap:        { alignItems: 'center', marginBottom: SPACING.sm },
   logoImg:         { width: 120, height: 120, borderRadius: RADIUS.xl },
   logoPlaceholder: { width: 120, height: 120, borderRadius: RADIUS.xl, backgroundColor: COLORS.primaryLight, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: COLORS.primary, borderStyle: 'dashed', gap: 6 },
@@ -403,19 +485,23 @@ const sr = StyleSheet.create({
   input:           { fontSize: 14, color: COLORS.gray800, padding: 0 },
   errorTxt:        { fontSize: 12, color: COLORS.red, fontWeight: FONT.semibold, marginTop: 4 },
   catsGrid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: SPACING.sm },
-  catBtn:          { width: '30%', alignItems: 'center', padding: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border, gap: 4 },
+  catBtn:          { width: '30%', alignItems: 'center', padding: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border, gap: 6 },
   catBtnActive:    { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight },
   catLabel:        { fontSize: 11, fontWeight: FONT.bold, color: COLORS.gray600, textAlign: 'center' },
   catLabelActive:  { color: COLORS.primary },
   verifySub:       { fontSize: 12, color: COLORS.gray400, marginBottom: SPACING.md, lineHeight: 18, marginTop: -8 },
+  docHelp:         { fontSize: 11, color: COLORS.gray400, marginBottom: 8, lineHeight: 16 },
   docWrap:         { borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 1.5, borderColor: COLORS.border },
   docImg:          { width: '100%', height: 180 },
   docEditBadge:    { position: 'absolute', bottom: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: RADIUS.sm, paddingHorizontal: 8, paddingVertical: 4 },
+  docFileRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: SPACING.lg, backgroundColor: COLORS.gray50 },
+  docFileIconWrap: { width: 48, height: 48, borderRadius: RADIUS.lg, backgroundColor: COLORS.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  docFileName:     { fontSize: 13, fontWeight: FONT.bold, color: COLORS.gray800 },
+  docFileSub:      { fontSize: 11, color: COLORS.gray400, marginTop: 2 },
   docPlaceholder:  { height: 140, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.gray50, gap: 6, borderStyle: 'dashed', borderWidth: 2, borderColor: COLORS.border, borderRadius: RADIUS.lg },
   docHint:         { fontSize: 13, color: COLORS.gray600, fontWeight: FONT.semibold, textAlign: 'center', paddingHorizontal: 20 },
   docHintSub:      { fontSize: 11, color: COLORS.gray400, textAlign: 'center' },
   infoCard:        { flexDirection: 'row', gap: 10, backgroundColor: COLORS.blueLight, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.md },
-  infoIcon:        { fontSize: 20 },
   infoTitle:       { fontSize: 13, fontWeight: FONT.black, color: COLORS.blue, marginBottom: 6 },
   infoTxt:         { fontSize: 12, color: COLORS.blue, lineHeight: 20 },
   createBtn:       { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: 15, alignItems: 'center', ...SHADOW.strong },

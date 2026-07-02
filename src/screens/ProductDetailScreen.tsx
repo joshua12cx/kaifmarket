@@ -5,6 +5,11 @@ import {
   ActivityIndicator, FlatList, Dimensions, Animated, Image, Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  ChevronLeft, ChevronRight, Heart, ShoppingCart, X, ZoomIn,
+  Store, Check, Star, ThumbsUp, ClipboardList, Minus, Plus,
+  Package, User, Truck,
+} from 'lucide-react-native';
 import { COLORS, SPACING, RADIUS, FONT, SHADOW } from '../theme';
 import { PRODUCTS, SELLERS } from '../data';
 import { useCart, useFavs, useAuth } from '../context';
@@ -13,9 +18,9 @@ import { supabase } from '../lib/supabase';
 const { width, height } = Dimensions.get('window');
 
 const REVIEWS = [
-  { id: 1, name: 'Carlos M.', avatar: '👨', rating: 5, date: 'hace 2 días', text: 'Excelente producto, llegó rápido y bien empacado.', likes: 12 },
-  { id: 2, name: 'María G.',  avatar: '👩', rating: 4, date: 'hace 5 días', text: 'Muy buena calidad para el precio.', likes: 8 },
-  { id: 3, name: 'Pedro R.',  avatar: '🧑', rating: 5, date: 'hace 1 sem',  text: 'Superó mis expectativas.', likes: 5 },
+  { id: 1, name: 'Carlos M.', rating: 5, date: 'hace 2 días', text: 'Excelente producto, llegó rápido y bien empacado.', likes: 12 },
+  { id: 2, name: 'María G.',  rating: 4, date: 'hace 5 días', text: 'Muy buena calidad para el precio.', likes: 8 },
+  { id: 3, name: 'Pedro R.',  rating: 5, date: 'hace 1 sem',  text: 'Superó mis expectativas.', likes: 5 },
 ];
 
 export default function ProductDetailScreen({ route, navigation }: any) {
@@ -44,7 +49,6 @@ export default function ProductDetailScreen({ route, navigation }: any) {
             .from('products').select('*').eq('id', productId).single();
 
           if (sp && !error) {
-            // ── Cargar specs de Supabase ──────────────────────
             const { data: specsData } = await supabase
               .from('product_specs')
               .select('key, value, order_num')
@@ -84,19 +88,17 @@ export default function ProductDetailScreen({ route, navigation }: any) {
   // ── Normalizar con specs de Supabase ──────────────────────────
   const normalizeSupabaseProduct = (p: any, specs: any[]) => ({
     ...p,
-    images:      [p.image_url, p.image_url_2, p.image_url_3].filter(Boolean),
     imageUrls:   [p.image_url, p.image_url_2, p.image_url_3].filter(Boolean),
     isRealImage: true,
     oldPrice:    p.old_price,
-    bgColor:     p.bg_color || '#F5F5F5',
+    bgColor:     p.bg_color || COLORS.gray200,
     reviews:     p.review_count || 0,
-    specs:       specs, // ← specs reales de Supabase
+    specs:       specs,
     category:    p.category_id,
   });
 
   const normalizeStaticProduct = (p: any) => ({
     ...p,
-    images:      p.images  || [p.emoji],
     imageUrls:   [],
     isRealImage: false,
     reviews:     p.reviews || 0,
@@ -105,7 +107,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
 
   if (loading || !data) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.white }}>
         <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
@@ -119,9 +121,10 @@ export default function ProductDetailScreen({ route, navigation }: any) {
     ? Math.round((((p.oldPrice || p.old_price) - p.price) / (p.oldPrice || p.old_price)) * 100)
     : null;
 
-  const slideImages = p.isRealImage
+  // ── Slides: solo imágenes reales; sin imagen → placeholder ────
+  const slideImages: (string | null)[] = p.isRealImage
     ? (p.imageUrls.length > 0 ? p.imageUrls : [null])
-    : (p.images || [p.emoji]);
+    : [null];
 
   const handleAddToCart = () => {
     dispatch({ type: 'ADD', id: p.id });
@@ -129,13 +132,19 @@ export default function ProductDetailScreen({ route, navigation }: any) {
     setTimeout(() => setAddedFeedback(false), 1500);
   };
 
-  const renderStars = (n: number) =>
+  const renderStars = (n: number, size = 14) =>
     Array(5).fill(0).map((_, i) => (
-      <Text key={i} style={{ color: i < n ? '#F5A623' : COLORS.gray200, fontSize: 14 }}>★</Text>
+      <Star
+        key={i}
+        size={size}
+        color={i < n ? COLORS.gold : COLORS.gray200}
+        fill={i < n ? COLORS.gold : COLORS.gray200}
+        strokeWidth={0}
+      />
     ));
 
   return (
-    <View style={[pd.container, { paddingTop: insets.top }]}>
+    <View style={[pd.container]}>
 
       {/* ── MODAL FULLSCREEN ── */}
       <Modal
@@ -153,10 +162,10 @@ export default function ProductDetailScreen({ route, navigation }: any) {
             getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
             renderItem={({ item }) => (
               <View style={pd.fsSlide}>
-                {p.isRealImage && item ? (
+                {item ? (
                   <Image source={{ uri: item }} style={pd.fsImage} resizeMode="contain" />
                 ) : (
-                  <Text style={{ fontSize: 140 }}>{item || p.emoji || '📦'}</Text>
+                  <Package size={120} color="rgba(255,255,255,0.3)" strokeWidth={1.2} />
                 )}
               </View>
             )}
@@ -164,7 +173,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
           <TouchableOpacity
             style={[pd.fsClose, { top: insets.top + 12 }]}
             onPress={() => setFullscreen(false)}>
-            <Text style={pd.fsCloseTxt}>✕</Text>
+            <X size={18} color="#fff" strokeWidth={2.5} />
           </TouchableOpacity>
           {slideImages.length > 1 && (
             <View style={pd.fsCounter}>
@@ -173,28 +182,6 @@ export default function ProductDetailScreen({ route, navigation }: any) {
           )}
         </View>
       </Modal>
-
-      {/* ── TOP BAR ── */}
-      <View style={pd.topBar}>
-        <TouchableOpacity style={pd.topBtn} onPress={() => navigation.goBack()}>
-          <Text style={pd.topBtnTxt}>‹</Text>
-        </TouchableOpacity>
-        <View style={pd.topRight}>
-          <TouchableOpacity style={pd.topBtn} onPress={() => toggle(p.id)}>
-            <Text style={{ fontSize: 18 }}>{isFav(p.id) ? '❤️' : '🤍'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[pd.topBtn, { position: 'relative' }]}
-            onPress={() => navigation.navigate('Cart')}>
-            <Text style={{ fontSize: 18 }}>🛒</Text>
-            {inCart && (
-              <View style={pd.cartBadge}>
-                <Text style={pd.cartBadgeTxt}>{qty}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
 
       <Animated.ScrollView
         showsVerticalScrollIndicator={false}
@@ -217,27 +204,56 @@ export default function ProductDetailScreen({ route, navigation }: any) {
             renderItem={({ item }) => (
               <TouchableOpacity
                 activeOpacity={0.95}
-                onPress={() => p.isRealImage && setFullscreen(true)}>
-                <View style={[pd.imgSlide, { backgroundColor: p.bgColor || '#F5F5F5' }]}>
-                  {p.isRealImage && item ? (
+                onPress={() => item && setFullscreen(true)}>
+                <View style={[pd.imgSlide, { backgroundColor: item ? COLORS.gray200 : (p.bgColor || COLORS.gray100) }]}>
+                  {item ? (
                     <Image source={{ uri: item }} style={pd.realImage} resizeMode="contain" />
                   ) : (
-                    <Text style={pd.imgEmoji}>{item || p.emoji || '📦'}</Text>
+                    <Package size={88} color={COLORS.gray400} strokeWidth={1.3} />
                   )}
                 </View>
               </TouchableOpacity>
             )}
           />
+
+          {/* ── TOP BAR FLOTANTE ── */}
+          <View style={[pd.topBar, { paddingTop: insets.top + 8 }]}>
+            <TouchableOpacity style={pd.topBtn} onPress={() => navigation.goBack()}>
+              <ChevronLeft size={22} color={COLORS.gray800} strokeWidth={2.5} />
+            </TouchableOpacity>
+            <View style={pd.topRight}>
+              <TouchableOpacity style={pd.topBtn} onPress={() => toggle(p.id)}>
+                <Heart
+                  size={18}
+                  color={isFav(p.id) ? COLORS.primary : COLORS.gray800}
+                  fill={isFav(p.id) ? COLORS.primary : 'transparent'}
+                  strokeWidth={2}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[pd.topBtn, { position: 'relative' }]}
+                onPress={() => navigation.navigate('Cart')}>
+                <ShoppingCart size={18} color={COLORS.gray800} strokeWidth={2} />
+                {inCart && (
+                  <View style={pd.cartBadge}>
+                    <Text style={pd.cartBadgeTxt}>{qty}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {slideImages.length > 1 && (
             <View style={pd.imgDots}>
-              {slideImages.map((_: any, i: number) => (
+              {slideImages.map((_, i) => (
                 <View key={i} style={[pd.imgDot, i === activeImg && pd.imgDotActive]} />
               ))}
             </View>
           )}
-          {p.isRealImage && (
+          {slideImages[activeImg] && (
             <TouchableOpacity style={pd.zoomHint} onPress={() => setFullscreen(true)}>
-              <Text style={pd.zoomHintTxt}>🔍 Toca para ampliar</Text>
+              <ZoomIn size={13} color="#fff" strokeWidth={2.2} />
+              <Text style={pd.zoomHintTxt}>Ampliar</Text>
             </TouchableOpacity>
           )}
           {disc && (
@@ -260,7 +276,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
             </View>
             <Text style={pd.productName}>{p.name}</Text>
             <View style={pd.ratingRow}>
-              <View style={{ flexDirection: 'row' }}>{renderStars(Math.floor(p.rating || 5))}</View>
+              <View style={{ flexDirection: 'row', gap: 1 }}>{renderStars(Math.floor(p.rating || 5))}</View>
               <Text style={pd.ratingNum}>{p.rating || 5}</Text>
               <Text style={pd.ratingCount}>({p.reviews || p.review_count || 0} reseñas)</Text>
               <Text style={pd.soldCount}>· {(p.sold || 0).toLocaleString()} vendidos</Text>
@@ -270,20 +286,25 @@ export default function ProductDetailScreen({ route, navigation }: any) {
           {/* ── CUPÓN ── */}
           {showCoupon && (
             <View style={pd.couponBanner}>
-              <Text style={pd.couponBadge}>-5%</Text>
+              <View style={pd.couponBadge}>
+                <Text style={pd.couponBadgeTxt}>-5%</Text>
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={pd.couponTitle}>Código KAIF10</Text>
                 <Text style={pd.couponSub}>Válido hasta el 31 de Mayo</Text>
               </View>
               <TouchableOpacity onPress={() => setShowCoupon(false)}>
-                <Text style={{ color: COLORS.gray400, fontSize: 18 }}>✕</Text>
+                <X size={16} color={COLORS.gray400} strokeWidth={2} />
               </TouchableOpacity>
             </View>
           )}
 
           {/* ── ENTREGA ── */}
           <View style={pd.deliveryCard}>
-            <Text style={pd.deliveryTitle}>Entrega</Text>
+            <View style={pd.deliveryTitleRow}>
+              <Truck size={16} color={COLORS.gray600} strokeWidth={2} />
+              <Text style={pd.deliveryTitle}>Entrega</Text>
+            </View>
             <View style={pd.deliveryOpts}>
               <View style={[pd.deliveryOpt, { borderColor: COLORS.primary }]}>
                 <Text style={pd.deliveryOptLabel}>Estándar</Text>
@@ -324,7 +345,6 @@ export default function ProductDetailScreen({ route, navigation }: any) {
             <View style={pd.tabContent}>
               {p.specs && p.specs.length > 0 ? (
                 p.specs.map((spec: any, i: number) => {
-                  // Soporta tanto objetos {key, value} como strings "key: value"
                   const key = typeof spec === 'string' ? spec.split(': ')[0] : spec.key;
                   const val = typeof spec === 'string' ? spec.split(': ')[1] : spec.value;
                   return (
@@ -338,7 +358,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
                 })
               ) : (
                 <View style={pd.specsEmpty}>
-                  <Text style={{ fontSize: 32, marginBottom: 8 }}>📋</Text>
+                  <ClipboardList size={32} color={COLORS.gray200} strokeWidth={1.5} />
                   <Text style={pd.specsEmptyTxt}>Sin especificaciones disponibles</Text>
                   <Text style={pd.specsEmptySub}>
                     El vendedor no ha agregado características para este producto
@@ -354,7 +374,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
               <View style={pd.ratingSum}>
                 <Text style={pd.ratingSumBig}>{p.rating || 5}</Text>
                 <View>
-                  <View style={{ flexDirection: 'row', marginBottom: 4 }}>
+                  <View style={{ flexDirection: 'row', gap: 1, marginBottom: 4 }}>
                     {renderStars(Math.floor(p.rating || 5))}
                   </View>
                   <Text style={{ fontSize: 12, color: COLORS.gray400 }}>
@@ -365,16 +385,18 @@ export default function ProductDetailScreen({ route, navigation }: any) {
               {REVIEWS.map(rev => (
                 <View key={rev.id} style={pd.reviewCard}>
                   <View style={pd.revHeader}>
-                    <Text style={pd.revAvatar}>{rev.avatar}</Text>
+                    <View style={pd.revAvatar}>
+                      <User size={18} color={COLORS.primary} strokeWidth={2} />
+                    </View>
                     <View style={{ flex: 1 }}>
                       <Text style={pd.revName}>{rev.name}</Text>
-                      <View style={{ flexDirection: 'row' }}>{renderStars(rev.rating)}</View>
+                      <View style={{ flexDirection: 'row', gap: 1 }}>{renderStars(rev.rating, 12)}</View>
                     </View>
                     <Text style={pd.revDate}>{rev.date}</Text>
                   </View>
                   <Text style={pd.revText}>{rev.text}</Text>
                   <View style={pd.revLike}>
-                    <Text style={{ fontSize: 14 }}>👍</Text>
+                    <ThumbsUp size={13} color={COLORS.gray400} strokeWidth={2} />
                     <Text style={pd.revLikeTxt}>{rev.likes}</Text>
                   </View>
                 </View>
@@ -397,7 +419,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
                   />
                 ) : (
                   <View style={pd.sellerAvatar}>
-                    <Text style={{ fontSize: 22 }}>🏪</Text>
+                    <Store size={24} color={COLORS.primary} strokeWidth={1.8} />
                   </View>
                 )}
                 <View style={{ flex: 1 }}>
@@ -405,7 +427,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
                     <Text style={pd.sellerName}>{seller.name}</Text>
                     {(seller.is_verified || seller.verified) && (
                       <View style={pd.verifiedBadge}>
-                        <Text style={pd.verifiedTxt}>✓</Text>
+                        <Check size={10} color="#fff" strokeWidth={3} />
                       </View>
                     )}
                     {isOwner && (
@@ -418,11 +440,14 @@ export default function ProductDetailScreen({ route, navigation }: any) {
                     Tienda oficial · {seller.location || 'Lima, Perú'}
                   </Text>
                 </View>
-                <Text style={{ color: COLORS.gray400, fontSize: 18 }}>›</Text>
+                <ChevronRight size={18} color={COLORS.gray400} strokeWidth={2} />
               </View>
               <View style={pd.sellerStats}>
                 <View style={pd.sellerStat}>
-                  <Text style={pd.sellerStatVal}>⭐ {seller.rating || 5}</Text>
+                  <View style={pd.sellerStatValRow}>
+                    <Star size={12} color={COLORS.gold} fill={COLORS.gold} strokeWidth={0} />
+                    <Text style={pd.sellerStatVal}>{seller.rating || 5}</Text>
+                  </View>
                   <Text style={pd.sellerStatLbl}>Rating</Text>
                 </View>
                 <View style={pd.sellerStatDiv} />
@@ -452,21 +477,31 @@ export default function ProductDetailScreen({ route, navigation }: any) {
                   data={related}
                   keyExtractor={item => String(item.id)}
                   contentContainerStyle={{ gap: 10 }}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={pd.relCard}
-                      onPress={() => navigation.replace('ProductDetail', { productId: item.id })}
-                      activeOpacity={0.9}>
-                      <View style={[pd.relImg, { backgroundColor: item.bgColor }]}>
-                        <Text style={{ fontSize: 40 }}>{item.emoji}</Text>
-                      </View>
-                      <View style={pd.relInfo}>
-                        <Text style={pd.relPrice}>S/ {item.price}</Text>
-                        <Text style={pd.relName} numberOfLines={2}>{item.name}</Text>
-                        <Text style={pd.relStars}>★ {item.rating}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  )}
+                  renderItem={({ item }) => {
+                    const relImageUrl = (item as any).image_url || null;
+                    return (
+                      <TouchableOpacity
+                        style={pd.relCard}
+                        onPress={() => navigation.replace('ProductDetail', { productId: item.id })}
+                        activeOpacity={0.9}>
+                        <View style={[pd.relImg, { backgroundColor: relImageUrl ? COLORS.gray200 : (item.bgColor || COLORS.gray100) }]}>
+                          {relImageUrl ? (
+                            <Image source={{ uri: relImageUrl }} style={pd.relImgReal} resizeMode="cover" />
+                          ) : (
+                            <Package size={36} color={COLORS.gray400} strokeWidth={1.5} />
+                          )}
+                        </View>
+                        <View style={pd.relInfo}>
+                          <Text style={pd.relPrice}>S/ {item.price}</Text>
+                          <Text style={pd.relName} numberOfLines={2}>{item.name}</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 }}>
+                            <Star size={10} color={COLORS.gold} fill={COLORS.gold} strokeWidth={0} />
+                            <Text style={pd.relStars}>{item.rating}</Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  }}
                 />
               </View>
             ) : null;
@@ -483,7 +518,8 @@ export default function ProductDetailScreen({ route, navigation }: any) {
             style={pd.editBtn}
             onPress={() => navigation.navigate('ProfileTab', { screen: 'SellerDashboard' })}
             activeOpacity={0.85}>
-            <Text style={pd.editBtnTxt}>🏪 Ir a mi panel de vendedor</Text>
+            <Store size={16} color={COLORS.amber} strokeWidth={2} />
+            <Text style={pd.editBtnTxt}>Ir a mi panel de vendedor</Text>
           </TouchableOpacity>
         ) : (
           <>
@@ -492,13 +528,13 @@ export default function ProductDetailScreen({ route, navigation }: any) {
                 <TouchableOpacity
                   style={pd.qtyBtn}
                   onPress={() => dispatch({ type: 'DECREMENT', id: p.id })}>
-                  <Text style={pd.qtyBtnTxt}>−</Text>
+                  <Minus size={15} color={COLORS.primary} strokeWidth={2.5} />
                 </TouchableOpacity>
                 <Text style={pd.qtyNum}>{qty}</Text>
                 <TouchableOpacity
                   style={pd.qtyBtn}
                   onPress={() => dispatch({ type: 'INCREMENT', id: p.id })}>
-                  <Text style={pd.qtyBtnTxt}>+</Text>
+                  <Plus size={15} color={COLORS.primary} strokeWidth={2.5} />
                 </TouchableOpacity>
               </View>
             )}
@@ -514,9 +550,19 @@ export default function ProductDetailScreen({ route, navigation }: any) {
               style={[pd.cartBtn, addedFeedback && pd.cartBtnFeedback]}
               onPress={handleAddToCart}
               activeOpacity={0.8}>
-              <Text style={[pd.cartBtnTxt, addedFeedback && { color: '#fff' }]}>
-                {addedFeedback ? '✓ Agregado' : inCart ? `🛒 Agregar más (${qty})` : '🛒 Al carrito'}
-              </Text>
+              {addedFeedback ? (
+                <View style={pd.cartBtnContent}>
+                  <Check size={15} color="#fff" strokeWidth={2.5} />
+                  <Text style={[pd.cartBtnTxt, { color: '#fff' }]}>Agregado</Text>
+                </View>
+              ) : (
+                <View style={pd.cartBtnContent}>
+                  <ShoppingCart size={15} color={COLORS.gray800} strokeWidth={2} />
+                  <Text style={pd.cartBtnTxt}>
+                    {inCart ? `Agregar más (${qty})` : 'Al carrito'}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           </>
         )}
@@ -527,48 +573,47 @@ export default function ProductDetailScreen({ route, navigation }: any) {
 }
 
 const pd = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: COLORS.white },
-  topBar:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 8, backgroundColor: COLORS.white },
-  topBtn:          { width: 36, height: 36, backgroundColor: COLORS.gray100, borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
-  topBtnTxt:       { fontSize: 24, color: COLORS.gray800, fontWeight: FONT.bold, lineHeight: 28 },
+  container:       { flex: 1, backgroundColor: COLORS.black },
+  topBar:          { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, zIndex: 5 },
+  topBtn:          { width: 36, height: 36, backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
   topRight:        { flexDirection: 'row', gap: 8 },
   cartBadge:       { position: 'absolute', top: -4, right: -4, backgroundColor: COLORS.primary, borderRadius: RADIUS.full, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   cartBadgeTxt:    { color: '#fff', fontSize: 9, fontWeight: FONT.black },
   fsWrap:          { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', alignItems: 'center', justifyContent: 'center' },
   fsSlide:         { width, height, alignItems: 'center', justifyContent: 'center' },
   fsImage:         { width, height: height * 0.8 },
-  fsClose:         { position: 'absolute', right: 16, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: RADIUS.full, width: 40, height: 40, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
-  fsCloseTxt:      { color: '#fff', fontSize: 16, fontWeight: FONT.black },
-  fsCounter:       { position: 'absolute', bottom: 50, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: RADIUS.full, paddingHorizontal: 16, paddingVertical: 6 },
+  fsClose:         { position: 'absolute', right: 16, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: RADIUS.full, width: 40, height: 40, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+  fsCounter:       { position: 'absolute', bottom: 50, alignSelf: 'center', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: RADIUS.full, paddingHorizontal: 16, paddingVertical: 6 },
   fsCounterTxt:    { color: '#fff', fontSize: 14, fontWeight: FONT.bold },
   imgWrap:         { position: 'relative' },
-  imgSlide:        { width, height: 300, alignItems: 'center', justifyContent: 'center' },
+  imgSlide:        { width, height: 320, alignItems: 'center', justifyContent: 'center' },
   realImage:       { width: '100%', height: '100%' },
-  imgEmoji:        { fontSize: 110 },
-  imgDots:         { position: 'absolute', bottom: 28, flexDirection: 'row', alignSelf: 'center', gap: 6 },
+  imgDots:         { position: 'absolute', bottom: 16, flexDirection: 'row', alignSelf: 'center', gap: 6 },
   imgDot:          { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.2)' },
   imgDotActive:    { backgroundColor: COLORS.primary, width: 18 },
-  zoomHint:        { position: 'absolute', bottom: 8, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: RADIUS.full, paddingHorizontal: 12, paddingVertical: 4 },
+  zoomHint:        { position: 'absolute', bottom: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: RADIUS.full, paddingHorizontal: 10, paddingVertical: 5 },
   zoomHintTxt:     { color: '#fff', fontSize: 11, fontWeight: FONT.semibold },
-  discBadge:       { position: 'absolute', top: 16, left: 16, backgroundColor: COLORS.red, borderRadius: RADIUS.sm, paddingHorizontal: 8, paddingVertical: 4 },
+  discBadge:       { position: 'absolute', top: 16, left: 16, marginTop: 44, backgroundColor: COLORS.red, borderRadius: RADIUS.sm, paddingHorizontal: 8, paddingVertical: 4 },
   discTxt:         { color: '#fff', fontSize: 13, fontWeight: FONT.black },
-  body:            { backgroundColor: COLORS.white },
+  body:            { backgroundColor: COLORS.white, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, marginTop: -RADIUS.xl, overflow: 'hidden' },
   priceSection:    { padding: SPACING.lg, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
   priceRow:        { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 8, flexWrap: 'wrap' },
-  price:           { fontSize: 28, fontWeight: FONT.black, color: COLORS.red },
+  price:           { fontSize: 28, fontWeight: FONT.black, color: COLORS.primary },
   oldPrice:        { fontSize: 16, color: COLORS.gray400, textDecorationLine: 'line-through' },
-  discLabel:       { fontSize: 14, color: COLORS.red, fontWeight: FONT.bold },
+  discLabel:       { fontSize: 14, color: COLORS.primary, fontWeight: FONT.bold },
   productName:     { fontSize: 16, fontWeight: FONT.bold, color: COLORS.gray800, lineHeight: 22, marginBottom: 10 },
   ratingRow:       { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
-  ratingNum:       { fontSize: 14, fontWeight: FONT.bold, color: COLORS.gray800 },
+  ratingNum:       { fontSize: 14, fontWeight: FONT.bold, color: COLORS.gray800, marginLeft: 4 },
   ratingCount:     { fontSize: 13, color: COLORS.gray400 },
   soldCount:       { fontSize: 13, color: COLORS.gray400 },
-  couponBanner:    { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#FFF8E1', borderWidth: 1, borderColor: '#FFD700', borderRadius: RADIUS.md, marginHorizontal: SPACING.lg, marginBottom: SPACING.md, padding: SPACING.md },
-  couponBadge:     { backgroundColor: '#FFD700', borderRadius: RADIUS.sm, paddingHorizontal: 8, paddingVertical: 4, fontWeight: FONT.black, fontSize: 14, color: COLORS.gray800 },
+  couponBanner:    { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: COLORS.goldLight, borderWidth: 1, borderColor: COLORS.gold, borderRadius: RADIUS.md, marginHorizontal: SPACING.lg, marginTop: SPACING.md, marginBottom: SPACING.md, padding: SPACING.md },
+  couponBadge:     { backgroundColor: COLORS.gold, borderRadius: RADIUS.sm, paddingHorizontal: 8, paddingVertical: 4 },
+  couponBadgeTxt:  { fontWeight: FONT.black, fontSize: 14, color: COLORS.gray800 },
   couponTitle:     { fontSize: 13, fontWeight: FONT.bold, color: COLORS.gray800 },
   couponSub:       { fontSize: 11, color: COLORS.gray400 },
   deliveryCard:    { margin: SPACING.lg, marginTop: 0, backgroundColor: COLORS.gray100, borderRadius: RADIUS.lg, padding: SPACING.md },
-  deliveryTitle:   { fontSize: 14, fontWeight: FONT.black, color: COLORS.gray800, marginBottom: 10 },
+  deliveryTitleRow:{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  deliveryTitle:   { fontSize: 14, fontWeight: FONT.black, color: COLORS.gray800 },
   deliveryOpts:    { flexDirection: 'row', gap: 10 },
   deliveryOpt:     { flex: 1, backgroundColor: COLORS.white, borderRadius: RADIUS.md, borderWidth: 1.5, borderColor: COLORS.border, padding: 10, alignItems: 'center' },
   deliveryOptLabel:{ fontSize: 13, fontWeight: FONT.bold, color: COLORS.gray800 },
@@ -583,18 +628,18 @@ const pd = StyleSheet.create({
   specRow:         { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: SPACING.md, paddingVertical: 10, borderRadius: RADIUS.sm, marginBottom: 4 },
   specKey:         { fontSize: 13, color: COLORS.gray600, fontWeight: FONT.semibold, flex: 1 },
   specVal:         { fontSize: 13, color: COLORS.gray800, fontWeight: FONT.bold, flex: 1, textAlign: 'right' },
-  specsEmpty:      { alignItems: 'center', paddingVertical: 32 },
-  specsEmptyTxt:   { fontSize: 14, fontWeight: FONT.black, color: COLORS.gray800, marginBottom: 6 },
+  specsEmpty:      { alignItems: 'center', paddingVertical: 32, gap: 8 },
+  specsEmptyTxt:   { fontSize: 14, fontWeight: FONT.black, color: COLORS.gray800 },
   specsEmptySub:   { fontSize: 12, color: COLORS.gray400, textAlign: 'center', lineHeight: 18 },
   ratingSum:       { flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: COLORS.gray100, borderRadius: RADIUS.lg, padding: SPACING.md, marginBottom: SPACING.md },
   ratingSumBig:    { fontSize: 40, fontWeight: FONT.black, color: COLORS.gray800 },
   reviewCard:      { backgroundColor: COLORS.gray100, borderRadius: RADIUS.lg, padding: SPACING.md, marginBottom: 10 },
   revHeader:       { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
-  revAvatar:       { fontSize: 28, width: 40, height: 40, textAlign: 'center', lineHeight: 40 },
+  revAvatar:       { width: 40, height: 40, borderRadius: RADIUS.full, backgroundColor: COLORS.primaryLight, alignItems: 'center', justifyContent: 'center' },
   revName:         { fontSize: 14, fontWeight: FONT.bold, color: COLORS.gray800, marginBottom: 2 },
   revDate:         { fontSize: 11, color: COLORS.gray400 },
   revText:         { fontSize: 13, color: COLORS.gray600, lineHeight: 20, marginBottom: 8 },
-  revLike:         { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  revLike:         { flexDirection: 'row', alignItems: 'center', gap: 5 },
   revLikeTxt:      { fontSize: 13, color: COLORS.gray400, fontWeight: FONT.semibold },
   sellerCard:      { margin: SPACING.lg, backgroundColor: COLORS.gray100, borderRadius: RADIUS.xl, padding: SPACING.lg },
   sellerHeader:    { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: SPACING.md },
@@ -603,11 +648,11 @@ const pd = StyleSheet.create({
   sellerName:      { fontSize: 15, fontWeight: FONT.black, color: COLORS.gray800 },
   sellerSub:       { fontSize: 12, color: COLORS.gray400, marginTop: 2 },
   verifiedBadge:   { backgroundColor: COLORS.primary, width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  verifiedTxt:     { color: '#fff', fontSize: 9, fontWeight: FONT.black },
   ownerTag:        { backgroundColor: COLORS.amberLight, borderRadius: RADIUS.full, paddingHorizontal: 8, paddingVertical: 3 },
   ownerTagTxt:     { fontSize: 11, color: COLORS.amber, fontWeight: FONT.bold },
   sellerStats:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sellerStat:      { flex: 1, alignItems: 'center' },
+  sellerStatValRow:{ flexDirection: 'row', alignItems: 'center', gap: 4 },
   sellerStatVal:   { fontSize: 13, fontWeight: FONT.black, color: COLORS.gray800 },
   sellerStatLbl:   { fontSize: 11, color: COLORS.gray400, marginTop: 2 },
   sellerStatDiv:   { width: 1, height: 30, backgroundColor: COLORS.border },
@@ -615,20 +660,21 @@ const pd = StyleSheet.create({
   relatedTitle:    { fontSize: 16, fontWeight: FONT.black, color: COLORS.gray800, marginBottom: SPACING.md },
   relCard:         { width: 140, backgroundColor: COLORS.white, borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 0.5, borderColor: COLORS.border, ...SHADOW.card },
   relImg:          { height: 110, alignItems: 'center', justifyContent: 'center' },
+  relImgReal:      { width: '100%', height: '100%' },
   relInfo:         { padding: 8 },
   relPrice:        { fontSize: 15, fontWeight: FONT.black, color: COLORS.gray800 },
   relName:         { fontSize: 11, color: COLORS.gray600, lineHeight: 15, marginTop: 2 },
-  relStars:        { fontSize: 11, color: '#F5A623', marginTop: 3 },
+  relStars:        { fontSize: 11, color: COLORS.gray600, fontWeight: FONT.semibold },
   bottomBar:       { flexDirection: 'row', gap: 10, padding: SPACING.lg, backgroundColor: COLORS.white, borderTopWidth: 0.5, borderTopColor: COLORS.border, ...SHADOW.strong },
-  editBtn:         { flex: 1, backgroundColor: COLORS.amberLight, borderRadius: RADIUS.lg, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: COLORS.amber },
+  editBtn:         { flex: 1, flexDirection: 'row', gap: 8, backgroundColor: COLORS.amberLight, borderRadius: RADIUS.lg, paddingVertical: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.amber },
   editBtnTxt:      { color: COLORS.amber, fontSize: 14, fontWeight: FONT.black },
   qtyRow:          { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: COLORS.gray100, borderRadius: RADIUS.md, paddingHorizontal: 6, paddingVertical: 4 },
   qtyBtn:          { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
-  qtyBtnTxt:       { fontSize: 20, fontWeight: FONT.bold, color: COLORS.primary, lineHeight: 24 },
   qtyNum:          { fontSize: 15, fontWeight: FONT.black, color: COLORS.gray800, minWidth: 18, textAlign: 'center' },
-  buyNowBtn:       { flex: 1, backgroundColor: COLORS.gray800, borderRadius: RADIUS.lg, paddingVertical: 14, alignItems: 'center' },
+  buyNowBtn:       { flex: 1, backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: 14, alignItems: 'center' },
   buyNowTxt:       { color: '#fff', fontSize: 14, fontWeight: FONT.black },
-  cartBtn:         { flex: 1, backgroundColor: '#FFD700', borderRadius: RADIUS.lg, paddingVertical: 14, alignItems: 'center' },
+  cartBtn:         { flex: 1, backgroundColor: COLORS.gold, borderRadius: RADIUS.lg, paddingVertical: 14, alignItems: 'center' },
   cartBtnFeedback: { backgroundColor: COLORS.green },
-  cartBtnTxt:      { color: COLORS.gray800, fontSize: 14, fontWeight: FONT.black },
+  cartBtnContent:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  cartBtnTxt:      { color: COLORS.gray800, fontSize: 13, fontWeight: FONT.black },
 });

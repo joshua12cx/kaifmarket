@@ -9,7 +9,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SPACING, RADIUS, FONT, SHADOW } from '../theme';
 import { useAuth, RegisterData } from '../context';
 
-// ── Opciones de género ─────────────────────────────────────────────
 const GENDER_OPTIONS = [
   { value: 'male',   label: 'Hombre', icon: '👨' },
   { value: 'female', label: 'Mujer',  icon: '👩' },
@@ -31,7 +30,6 @@ export default function RegisterScreen({ navigation }: any) {
   const [loading,   setLoading]   = useState(false);
   const [errors,    setErrors]    = useState<Record<string, string>>({});
 
-  // ── Validación ────────────────────────────────────────────────
   const validate = () => {
     const errs: Record<string, string> = {};
     if (!name.trim())                   { errs.name     = 'El nombre es requerido'; }
@@ -45,7 +43,6 @@ export default function RegisterScreen({ navigation }: any) {
     return Object.keys(errs).length === 0;
   };
 
-  // ── Registro ──────────────────────────────────────────────────
   const handleRegister = async () => {
     if (!validate()) { return; }
     setLoading(true);
@@ -64,6 +61,16 @@ export default function RegisterScreen({ navigation }: any) {
 
     if (result.error) {
       Alert.alert('Error al registrarse', result.error);
+      return;
+    }
+
+    if (isSeller) {
+      // ── Quiere vender: explicar el siguiente paso ────────────
+      Alert.alert(
+        '¡Cuenta creada! 🎉',
+        'Te enviamos un email de confirmación. Confirma tu cuenta, inicia sesión y luego completa el registro de tu tienda (incluye DNI/RUC y un documento) desde tu Perfil → Mi Tienda → Crear mi tienda.',
+        [{ text: 'Entendido', onPress: () => navigation.navigate('Login') }],
+      );
     } else {
       Alert.alert(
         '¡Cuenta creada! 🎉',
@@ -121,7 +128,6 @@ export default function RegisterScreen({ navigation }: any) {
         <View style={s.card}>
           <Text style={s.sectionTitle}>Tus datos</Text>
 
-          {/* Nombre */}
           <View style={s.fieldWrap}>
             <Text style={s.label}>Nombre completo *</Text>
             <View style={[s.inputWrap, errors.name && s.inputError]}>
@@ -140,7 +146,6 @@ export default function RegisterScreen({ navigation }: any) {
             {errors.name ? <Text style={s.errorTxt}>{errors.name}</Text> : null}
           </View>
 
-          {/* Email */}
           <View style={s.fieldWrap}>
             <Text style={s.label}>Email *</Text>
             <View style={[s.inputWrap, errors.email && s.inputError]}>
@@ -159,7 +164,6 @@ export default function RegisterScreen({ navigation }: any) {
             {errors.email ? <Text style={s.errorTxt}>{errors.email}</Text> : null}
           </View>
 
-          {/* Teléfono (opcional) */}
           <View style={s.fieldWrap}>
             <Text style={s.label}>Teléfono <Text style={s.optional}>(opcional)</Text></Text>
             <View style={s.inputWrap}>
@@ -175,7 +179,6 @@ export default function RegisterScreen({ navigation }: any) {
             </View>
           </View>
 
-          {/* Contraseña */}
           <View style={s.fieldWrap}>
             <Text style={s.label}>Contraseña *</Text>
             <View style={[s.inputWrap, errors.password && s.inputError]}>
@@ -195,7 +198,6 @@ export default function RegisterScreen({ navigation }: any) {
             </View>
             {errors.password ? <Text style={s.errorTxt}>{errors.password}</Text> : null}
 
-            {/* Indicador de seguridad */}
             {password.length > 0 && (
               <View style={s.strengthWrap}>
                 <View style={[s.strengthBar, {
@@ -212,7 +214,6 @@ export default function RegisterScreen({ navigation }: any) {
             )}
           </View>
 
-          {/* Confirmar contraseña */}
           <View style={s.fieldWrap}>
             <Text style={s.label}>Confirmar contraseña *</Text>
             <View style={[s.inputWrap, errors.password2 && s.inputError]}>
@@ -257,7 +258,9 @@ export default function RegisterScreen({ navigation }: any) {
               <Text style={s.sellerInfoTxt}>
                 ✓ Listado gratuito de productos{'\n'}
                 ✓ Comisión solo cuando vendas{'\n'}
-                ✓ Plan Premium disponible: S/ 55–80/mes
+                ✓ Plan Premium disponible: S/ 55–80/mes{'\n\n'}
+                📋 Después de crear tu cuenta, te pediremos tu DNI/RUC y un
+                documento para verificar tu tienda. La aprobación toma 24-48 horas.
               </Text>
             </View>
           )}

@@ -3,22 +3,26 @@ import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ScrollView, ActivityIndicator,
-  Alert, Image,
+  Alert, Image, StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchImageLibrary } from 'react-native-image-picker';
 import RNFS from 'react-native-fs';
+import {
+  ChevronLeft, Store, Pencil, AlertTriangle, Power,
+} from 'lucide-react-native';
 import { COLORS, SPACING, RADIUS, FONT, SHADOW } from '../theme';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context';
+import { getCategoryIcon } from '../utils/categoryIcons';
 
 const CATEGORIES = [
-  { id: 'electro', label: 'Electrónica', emoji: '📱' },
-  { id: 'hogar',   label: 'Hogar',       emoji: '🛋️' },
-  { id: 'moda',    label: 'Moda',        emoji: '👟' },
-  { id: 'belleza', label: 'Belleza',     emoji: '💄' },
-  { id: 'deporte', label: 'Deporte',     emoji: '⚽' },
-  { id: 'otros',   label: 'Otros',       emoji: '🛍️' },
+  { id: 'electro', label: 'Electrónica' },
+  { id: 'hogar',   label: 'Hogar'       },
+  { id: 'moda',    label: 'Moda'        },
+  { id: 'belleza', label: 'Belleza'     },
+  { id: 'deporte', label: 'Deporte'     },
+  { id: 'otros',   label: 'Otros'       },
 ];
 
 export default function SellerEditStore({ route, navigation }: any) {
@@ -151,9 +155,10 @@ export default function SellerEditStore({ route, navigation }: any) {
 
   return (
     <View style={[es.container, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       <View style={es.header}>
         <TouchableOpacity style={es.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={es.backTxt}>‹</Text>
+          <ChevronLeft size={22} color={COLORS.white} strokeWidth={2.5} />
         </TouchableOpacity>
         <Text style={es.headerTitle}>Editar tienda</Text>
         <View style={{ width: 36 }} />
@@ -172,12 +177,12 @@ export default function SellerEditStore({ route, navigation }: any) {
               <>
                 <Image source={{ uri: logoUri }} style={es.logoImg} />
                 <View style={es.logoEditBadge}>
-                  <Text style={{ color: '#fff', fontSize: 12 }}>✏️</Text>
+                  <Pencil size={13} color="#fff" strokeWidth={2.5} />
                 </View>
               </>
             ) : (
               <View style={es.logoPlaceholder}>
-                <Text style={{ fontSize: 36 }}>🏪</Text>
+                <Store size={32} color={COLORS.primary} strokeWidth={1.8} />
                 <Text style={es.logoHint}>Toca para subir logo</Text>
               </View>
             )}
@@ -259,24 +264,31 @@ export default function SellerEditStore({ route, navigation }: any) {
           <Text style={es.cardTitle}>Categoría principal *</Text>
           {errors.category ? <Text style={es.errorTxt}>{errors.category}</Text> : null}
           <View style={es.catsGrid}>
-            {CATEGORIES.map(cat => (
-              <TouchableOpacity
-                key={cat.id}
-                style={[es.catBtn, category === cat.id && es.catBtnActive]}
-                onPress={() => { setCategory(cat.id); setErrors(e => ({ ...e, category: '' })); }}
-                activeOpacity={0.8}>
-                <Text style={{ fontSize: 24 }}>{cat.emoji}</Text>
-                <Text style={[es.catLabel, category === cat.id && es.catLabelActive]}>
-                  {cat.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {CATEGORIES.map(cat => {
+              const Icon = getCategoryIcon(cat.id);
+              const active = category === cat.id;
+              return (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[es.catBtn, active && es.catBtnActive]}
+                  onPress={() => { setCategory(cat.id); setErrors(e => ({ ...e, category: '' })); }}
+                  activeOpacity={0.8}>
+                  <Icon size={24} color={active ? COLORS.primary : COLORS.gray600} strokeWidth={1.8} />
+                  <Text style={[es.catLabel, active && es.catLabelActive]}>
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
         {/* ── ZONA PELIGROSA ── */}
         <View style={es.dangerCard}>
-          <Text style={es.dangerTitle}>⚠️ Zona peligrosa</Text>
+          <View style={es.dangerTitleRow}>
+            <AlertTriangle size={16} color={COLORS.primary} strokeWidth={2} />
+            <Text style={es.dangerTitle}>Zona peligrosa</Text>
+          </View>
           <TouchableOpacity
             style={es.dangerBtn}
             onPress={() => {
@@ -300,6 +312,7 @@ export default function SellerEditStore({ route, navigation }: any) {
                 ],
               );
             }}>
+            <Power size={15} color={COLORS.primary} strokeWidth={2} />
             <Text style={es.dangerBtnTxt}>Desactivar todos mis productos</Text>
           </TouchableOpacity>
         </View>
@@ -326,12 +339,11 @@ export default function SellerEditStore({ route, navigation }: any) {
 }
 
 const es = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: COLORS.gray50 },
-  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14, backgroundColor: COLORS.white, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
-  backBtn:         { width: 36, height: 36, backgroundColor: COLORS.gray100, borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
-  backTxt:         { fontSize: 24, color: COLORS.gray800, fontWeight: FONT.bold, lineHeight: 28 },
-  headerTitle:     { fontSize: 17, fontWeight: FONT.black, color: COLORS.gray800 },
-  card:            { backgroundColor: COLORS.white, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.md, borderWidth: 0.5, borderColor: COLORS.border, ...SHADOW.card },
+  container:       { flex: 1, backgroundColor: COLORS.black },
+  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14, backgroundColor: COLORS.primary },
+  backBtn:         { width: 36, height: 36, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
+  headerTitle:     { fontSize: 17, fontWeight: FONT.black, color: COLORS.white },
+  card:            { backgroundColor: COLORS.white, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.md, ...SHADOW.card },
   cardTitle:       { fontSize: 15, fontWeight: FONT.black, color: COLORS.gray800, marginBottom: SPACING.md },
   logoWrap:        { alignItems: 'center', marginBottom: SPACING.sm, position: 'relative' },
   logoImg:         { width: 120, height: 120, borderRadius: RADIUS.xl },
@@ -348,14 +360,15 @@ const es = StyleSheet.create({
   input:           { fontSize: 14, color: COLORS.gray800, padding: 0 },
   errorTxt:        { fontSize: 12, color: COLORS.red, fontWeight: FONT.semibold, marginTop: 4 },
   catsGrid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: SPACING.sm },
-  catBtn:          { width: '30%', alignItems: 'center', padding: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border, gap: 4 },
+  catBtn:          { width: '30%', alignItems: 'center', padding: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border, gap: 6 },
   catBtnActive:    { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight },
   catLabel:        { fontSize: 11, fontWeight: FONT.bold, color: COLORS.gray600, textAlign: 'center' },
   catLabelActive:  { color: COLORS.primary },
-  dangerCard:      { backgroundColor: '#FFF5F5', borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.md, borderWidth: 1, borderColor: '#FFD0D0' },
-  dangerTitle:     { fontSize: 14, fontWeight: FONT.black, color: COLORS.red, marginBottom: SPACING.md },
-  dangerBtn:       { backgroundColor: '#FFE5E5', borderRadius: RADIUS.lg, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: '#FFB0B0' },
-  dangerBtnTxt:    { fontSize: 14, fontWeight: FONT.bold, color: COLORS.red },
+  dangerCard:      { backgroundColor: COLORS.white, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.md, ...SHADOW.card },
+  dangerTitleRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: SPACING.md },
+  dangerTitle:     { fontSize: 14, fontWeight: FONT.black, color: COLORS.primary },
+  dangerBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: COLORS.redLight, borderRadius: RADIUS.lg, paddingVertical: 12 },
+  dangerBtnTxt:    { fontSize: 14, fontWeight: FONT.bold, color: COLORS.primary },
   saveBtn:         { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: 15, alignItems: 'center', ...SHADOW.strong },
   saveBtnTxt:      { color: COLORS.white, fontSize: 15, fontWeight: FONT.black },
 });

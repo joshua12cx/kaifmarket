@@ -2,9 +2,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, ActivityIndicator, RefreshControl, Image,
+  StyleSheet, ActivityIndicator, RefreshControl, Image, StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  ChevronLeft, Lock, Store, Settings, MapPin, Check,
+  Package, Plus, ShoppingBag, Star, BarChart3, Inbox,
+  Lightbulb, Clock, XCircle,
+} from 'lucide-react-native';
 import { COLORS, SPACING, RADIUS, FONT, SHADOW } from '../theme';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context';
@@ -112,15 +117,18 @@ export default function SellerDashboardScreen({ navigation }: any) {
   if (!user) {
     return (
       <View style={[sd.container, { paddingTop: insets.top }]}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
         <View style={sd.header}>
           <TouchableOpacity style={sd.backBtn} onPress={() => navigation.goBack()}>
-            <Text style={sd.backTxt}>‹</Text>
+            <ChevronLeft size={22} color={COLORS.white} strokeWidth={2.5} />
           </TouchableOpacity>
           <Text style={sd.headerTitle}>Panel de Vendedor</Text>
           <View style={{ width: 36 }} />
         </View>
         <View style={sd.empty}>
-          <Text style={{ fontSize: 52, marginBottom: 16 }}>🔐</Text>
+          <View style={sd.emptyIconWrap}>
+            <Lock size={40} color={COLORS.gray400} strokeWidth={1.5} />
+          </View>
           <Text style={sd.emptyTitle}>Inicia sesión primero</Text>
           <TouchableOpacity style={sd.emptyBtn} onPress={() => navigation.navigate('Login')}>
             <Text style={sd.emptyBtnTxt}>Iniciar sesión</Text>
@@ -134,15 +142,18 @@ export default function SellerDashboardScreen({ navigation }: any) {
   if (!loading && !seller) {
     return (
       <View style={[sd.container, { paddingTop: insets.top }]}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
         <View style={sd.header}>
           <TouchableOpacity style={sd.backBtn} onPress={() => navigation.goBack()}>
-            <Text style={sd.backTxt}>‹</Text>
+            <ChevronLeft size={22} color={COLORS.white} strokeWidth={2.5} />
           </TouchableOpacity>
           <Text style={sd.headerTitle}>Panel de Vendedor</Text>
           <View style={{ width: 36 }} />
         </View>
         <View style={sd.empty}>
-          <Text style={{ fontSize: 52, marginBottom: 16 }}>🏪</Text>
+          <View style={sd.emptyIconWrap}>
+            <Store size={40} color={COLORS.gray400} strokeWidth={1.5} />
+          </View>
           <Text style={sd.emptyTitle}>Aún no tienes una tienda</Text>
           <Text style={sd.emptySub}>Regístrate como vendedor para empezar a vender en KaifMarket</Text>
           <TouchableOpacity style={sd.emptyBtn} onPress={() => navigation.navigate('SellerRegister')}>
@@ -157,9 +168,10 @@ export default function SellerDashboardScreen({ navigation }: any) {
   if (loading) {
     return (
       <View style={[sd.container, { paddingTop: insets.top }]}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
         <View style={sd.header}>
           <TouchableOpacity style={sd.backBtn} onPress={() => navigation.goBack()}>
-            <Text style={sd.backTxt}>‹</Text>
+            <ChevronLeft size={22} color={COLORS.white} strokeWidth={2.5} />
           </TouchableOpacity>
           <Text style={sd.headerTitle}>Mi Tienda</Text>
           <View style={{ width: 36 }} />
@@ -175,9 +187,10 @@ export default function SellerDashboardScreen({ navigation }: any) {
   if (seller.status === 'pending') {
     return (
       <View style={[sd.container, { paddingTop: insets.top }]}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
         <View style={sd.header}>
           <TouchableOpacity style={sd.backBtn} onPress={() => navigation.goBack()}>
-            <Text style={sd.backTxt}>‹</Text>
+            <ChevronLeft size={22} color={COLORS.white} strokeWidth={2.5} />
           </TouchableOpacity>
           <Text style={sd.headerTitle}>Mi Tienda</Text>
           <View style={{ width: 36 }} />
@@ -185,10 +198,12 @@ export default function SellerDashboardScreen({ navigation }: any) {
         <ScrollView
           contentContainerStyle={{ flexGrow: 1 }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} tintColor={COLORS.primary} />
           }>
           <View style={sd.statusWrap}>
-            <Text style={{ fontSize: 64, marginBottom: 16 }}>⏳</Text>
+            <View style={sd.statusIconWrap}>
+              <Clock size={36} color={COLORS.amber} strokeWidth={1.8} />
+            </View>
             <Text style={sd.statusTitle}>Tu tienda está en revisión</Text>
             <Text style={sd.statusSub}>
               Estamos verificando la información de "{seller.name}". Este proceso toma entre
@@ -200,14 +215,18 @@ export default function SellerDashboardScreen({ navigation }: any) {
                 <Image source={{ uri: seller.logo_url }} style={sd.statusLogoImg} resizeMode="cover" />
               ) : (
                 <View style={sd.storeAvatar}>
-                  <Text style={{ fontSize: 28 }}>🏪</Text>
+                  <Store size={28} color={COLORS.primary} strokeWidth={1.8} />
                 </View>
               )}
               <View style={{ flex: 1 }}>
                 <Text style={sd.statusCardName}>{seller.name}</Text>
-                <Text style={sd.statusCardSub}>📍 {seller.location || 'Lima, Perú'}</Text>
+                <View style={sd.statusCardSubRow}>
+                  <MapPin size={12} color={COLORS.gray400} strokeWidth={2} />
+                  <Text style={sd.statusCardSub}>{seller.location || 'Lima, Perú'}</Text>
+                </View>
                 <View style={sd.statusBadgePending}>
-                  <Text style={sd.statusBadgeTxt}>⏳ Pendiente de aprobación</Text>
+                  <Clock size={11} color={COLORS.amber} strokeWidth={2.5} />
+                  <Text style={sd.statusBadgeTxt}>Pendiente de aprobación</Text>
                 </View>
               </View>
             </View>
@@ -222,7 +241,8 @@ export default function SellerDashboardScreen({ navigation }: any) {
             <TouchableOpacity
               style={sd.statusEditBtn}
               onPress={() => navigation.navigate('SellerEditStore', { seller })}>
-              <Text style={sd.statusEditBtnTxt}>⚙️ Editar información de mi tienda</Text>
+              <Settings size={16} color="#fff" strokeWidth={2} />
+              <Text style={sd.statusEditBtnTxt}>Editar información de mi tienda</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -234,9 +254,10 @@ export default function SellerDashboardScreen({ navigation }: any) {
   if (seller.status === 'rejected') {
     return (
       <View style={[sd.container, { paddingTop: insets.top }]}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
         <View style={sd.header}>
           <TouchableOpacity style={sd.backBtn} onPress={() => navigation.goBack()}>
-            <Text style={sd.backTxt}>‹</Text>
+            <ChevronLeft size={22} color={COLORS.white} strokeWidth={2.5} />
           </TouchableOpacity>
           <Text style={sd.headerTitle}>Mi Tienda</Text>
           <View style={{ width: 36 }} />
@@ -244,11 +265,13 @@ export default function SellerDashboardScreen({ navigation }: any) {
         <ScrollView
           contentContainerStyle={{ flexGrow: 1 }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} tintColor={COLORS.primary} />
           }>
           <View style={sd.statusWrap}>
-            <Text style={{ fontSize: 64, marginBottom: 16 }}>❌</Text>
-            <Text style={[sd.statusTitle, { color: COLORS.red }]}>
+            <View style={[sd.statusIconWrap, { backgroundColor: COLORS.redLight }]}>
+              <XCircle size={36} color={COLORS.primary} strokeWidth={1.8} />
+            </View>
+            <Text style={[sd.statusTitle, { color: COLORS.primaryMid }]}>
               Tu solicitud no fue aprobada
             </Text>
             <Text style={sd.statusSub}>
@@ -265,7 +288,8 @@ export default function SellerDashboardScreen({ navigation }: any) {
             <TouchableOpacity
               style={sd.statusEditBtn}
               onPress={() => navigation.navigate('SellerEditStore', { seller })}>
-              <Text style={sd.statusEditBtnTxt}>⚙️ Editar y corregir información</Text>
+              <Settings size={16} color="#fff" strokeWidth={2} />
+              <Text style={sd.statusEditBtnTxt}>Editar y corregir información</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -276,17 +300,18 @@ export default function SellerDashboardScreen({ navigation }: any) {
   // ── APROBADO — DASHBOARD NORMAL ───────────────────────────────
   return (
     <View style={[sd.container, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
 
       {/* ── HEADER ── */}
       <View style={sd.header}>
         <TouchableOpacity style={sd.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={sd.backTxt}>‹</Text>
+          <ChevronLeft size={22} color={COLORS.white} strokeWidth={2.5} />
         </TouchableOpacity>
         <Text style={sd.headerTitle}>Mi Tienda</Text>
         <TouchableOpacity
-          style={sd.settingsBtn}
+          style={sd.backBtn}
           onPress={() => navigation.navigate('SellerEditStore', { seller })}>
-          <Text style={{ fontSize: 18 }}>⚙️</Text>
+          <Settings size={18} color={COLORS.white} strokeWidth={2} />
         </TouchableOpacity>
       </View>
 
@@ -294,7 +319,7 @@ export default function SellerDashboardScreen({ navigation }: any) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} tintColor={COLORS.primary} />
         }>
 
         {/* ── PERFIL TIENDA ── */}
@@ -303,7 +328,7 @@ export default function SellerDashboardScreen({ navigation }: any) {
             <Image source={{ uri: seller.logo_url }} style={sd.storeLogoImg} resizeMode="cover" />
           ) : (
             <View style={sd.storeAvatar}>
-              <Text style={{ fontSize: 36 }}>🏪</Text>
+              <Store size={32} color={COLORS.primary} strokeWidth={1.8} />
             </View>
           )}
           <View style={{ flex: 1 }}>
@@ -311,7 +336,7 @@ export default function SellerDashboardScreen({ navigation }: any) {
               <Text style={sd.storeName}>{seller?.name || 'Mi Tienda'}</Text>
               {seller?.is_verified && (
                 <View style={sd.verifiedBadge}>
-                  <Text style={sd.verifiedTxt}>✓</Text>
+                  <Check size={11} color="#fff" strokeWidth={3} />
                 </View>
               )}
               {seller?.is_premium && (
@@ -320,7 +345,10 @@ export default function SellerDashboardScreen({ navigation }: any) {
                 </View>
               )}
             </View>
-            <Text style={sd.storeLocation}>📍 {seller?.location || 'Lima, Perú'}</Text>
+            <View style={sd.storeLocationRow}>
+              <MapPin size={12} color={COLORS.gray400} strokeWidth={2} />
+              <Text style={sd.storeLocation}>{seller?.location || 'Lima, Perú'}</Text>
+            </View>
             {seller?.description && (
               <Text style={sd.storeDesc} numberOfLines={2}>{seller.description}</Text>
             )}
@@ -333,28 +361,36 @@ export default function SellerDashboardScreen({ navigation }: any) {
             style={sd.actionBtn}
             onPress={() => navigation.navigate('SellerProducts', { sellerId: seller.id })}
             activeOpacity={0.85}>
-            <Text style={{ fontSize: 28, marginBottom: 6 }}>📦</Text>
+            <View style={sd.actionIconWrap}>
+              <Package size={22} color={COLORS.primary} strokeWidth={1.8} />
+            </View>
             <Text style={sd.actionLabel}>Mis productos</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={sd.actionBtn}
             onPress={() => navigation.navigate('SellerAddProduct', { sellerId: seller.id })}
             activeOpacity={0.85}>
-            <Text style={{ fontSize: 28, marginBottom: 6 }}>➕</Text>
+            <View style={sd.actionIconWrap}>
+              <Plus size={22} color={COLORS.primary} strokeWidth={1.8} />
+            </View>
             <Text style={sd.actionLabel}>Agregar producto</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={sd.actionBtn}
             onPress={() => navigation.navigate('SellerOrders', { sellerId: seller.id })}
             activeOpacity={0.85}>
-            <Text style={{ fontSize: 28, marginBottom: 6 }}>🛍️</Text>
+            <View style={sd.actionIconWrap}>
+              <ShoppingBag size={22} color={COLORS.primary} strokeWidth={1.8} />
+            </View>
             <Text style={sd.actionLabel}>Mis ventas</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={sd.actionBtn}
+            style={[sd.actionBtn, { borderRightWidth: 0 }]}
             onPress={() => navigation.navigate('SellerReviews', { sellerId: seller.id })}
             activeOpacity={0.85}>
-            <Text style={{ fontSize: 28, marginBottom: 6 }}>⭐</Text>
+            <View style={sd.actionIconWrap}>
+              <Star size={22} color={COLORS.primary} strokeWidth={1.8} />
+            </View>
             <Text style={sd.actionLabel}>Reseñas</Text>
           </TouchableOpacity>
         </View>
@@ -362,7 +398,10 @@ export default function SellerDashboardScreen({ navigation }: any) {
         {/* ── ESTADÍSTICAS ── */}
         {stats && (
           <View style={sd.section}>
-            <Text style={sd.sectionTitle}>📊 Resumen</Text>
+            <View style={sd.sectionTitleRow}>
+              <BarChart3 size={16} color={COLORS.gray200} strokeWidth={2} />
+              <Text style={sd.sectionTitle}>Resumen</Text>
+            </View>
             <View style={sd.statsGrid}>
               <View style={sd.statCard}>
                 <Text style={sd.statVal}>{stats.totalProducts}</Text>
@@ -383,7 +422,10 @@ export default function SellerDashboardScreen({ navigation }: any) {
                 <Text style={sd.statLbl}>Ingresos</Text>
               </View>
               <View style={sd.statCard}>
-                <Text style={sd.statVal}>⭐ {stats.avgRating.toFixed(1)}</Text>
+                <View style={sd.statValRow}>
+                  <Star size={14} color={COLORS.gold} fill={COLORS.gold} strokeWidth={0} />
+                  <Text style={sd.statVal}>{stats.avgRating.toFixed(1)}</Text>
+                </View>
                 <Text style={sd.statLbl}>Rating</Text>
               </View>
               <View style={sd.statCard}>
@@ -397,7 +439,10 @@ export default function SellerDashboardScreen({ navigation }: any) {
         {/* ── PEDIDOS RECIENTES ── */}
         <View style={sd.section}>
           <View style={sd.sectionHeader}>
-            <Text style={sd.sectionTitle}>🛍️ Ventas recientes</Text>
+            <View style={sd.sectionTitleRow}>
+              <ShoppingBag size={16} color={COLORS.gray200} strokeWidth={2} />
+              <Text style={sd.sectionTitle}>Ventas recientes</Text>
+            </View>
             <TouchableOpacity
               onPress={() => navigation.navigate('SellerOrders', { sellerId: seller?.id })}>
               <Text style={sd.sectionLink}>Ver todas ›</Text>
@@ -406,7 +451,7 @@ export default function SellerDashboardScreen({ navigation }: any) {
 
           {orders.length === 0 ? (
             <View style={sd.emptyOrders}>
-              <Text style={{ fontSize: 32, marginBottom: 8 }}>📭</Text>
+              <Inbox size={32} color={COLORS.gray200} strokeWidth={1.5} />
               <Text style={sd.emptyOrdersTxt}>Aún no tienes ventas</Text>
               <Text style={sd.emptyOrdersSub}>
                 Cuando alguien compre tus productos aparecerán aquí
@@ -432,14 +477,14 @@ export default function SellerDashboardScreen({ navigation }: any) {
                     backgroundColor:
                       order.status === 'delivered' ? COLORS.greenLight :
                       order.status === 'shipped'   ? COLORS.blueLight  :
-                      order.status === 'cancelled' ? '#FFE5E5'          :
+                      order.status === 'cancelled' ? COLORS.redLight   :
                       COLORS.amberLight,
                   }]}>
                     <Text style={[sd.orderStatusTxt, {
                       color:
                         order.status === 'delivered' ? COLORS.green :
                         order.status === 'shipped'   ? COLORS.blue  :
-                        order.status === 'cancelled' ? COLORS.red   :
+                        order.status === 'cancelled' ? COLORS.primary :
                         COLORS.amber,
                     }]}>
                       {order.status === 'processing' ? 'Procesando' :
@@ -456,7 +501,9 @@ export default function SellerDashboardScreen({ navigation }: any) {
 
         {/* ── TIP ── */}
         <View style={sd.tipCard}>
-          <Text style={sd.tipIcon}>💡</Text>
+          <View style={sd.tipIconWrap}>
+            <Lightbulb size={20} color={COLORS.primary} strokeWidth={2} />
+          </View>
           <View style={{ flex: 1 }}>
             <Text style={sd.tipTitle}>Consejos para vender más</Text>
             <Text style={sd.tipTxt}>
@@ -472,7 +519,8 @@ export default function SellerDashboardScreen({ navigation }: any) {
         style={[sd.fab, { bottom: insets.bottom + 20 }]}
         onPress={() => navigation.navigate('SellerAddProduct', { sellerId: seller?.id })}
         activeOpacity={0.85}>
-        <Text style={sd.fabTxt}>+ Producto</Text>
+        <Plus size={16} color="#fff" strokeWidth={2.5} />
+        <Text style={sd.fabTxt}>Producto</Text>
       </TouchableOpacity>
 
     </View>
@@ -480,43 +528,45 @@ export default function SellerDashboardScreen({ navigation }: any) {
 }
 
 const sd = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: COLORS.gray50 },
-  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14, backgroundColor: COLORS.white, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
-  backBtn:         { width: 36, height: 36, backgroundColor: COLORS.gray100, borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
-  backTxt:         { fontSize: 24, color: COLORS.gray800, fontWeight: FONT.bold, lineHeight: 28 },
-  headerTitle:     { fontSize: 17, fontWeight: FONT.black, color: COLORS.gray800 },
-  settingsBtn:     { width: 36, height: 36, backgroundColor: COLORS.gray100, borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
+  container:       { flex: 1, backgroundColor: COLORS.black },
+  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14, backgroundColor: COLORS.primary },
+  backBtn:         { width: 36, height: 36, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
+  headerTitle:     { fontSize: 17, fontWeight: FONT.black, color: COLORS.white },
   empty:           { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-  emptyTitle:      { fontSize: 18, fontWeight: FONT.black, color: COLORS.gray800, textAlign: 'center', marginBottom: 8 },
+  emptyIconWrap:   { width: 80, height: 80, borderRadius: RADIUS.full, backgroundColor: COLORS.blackSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  emptyTitle:      { fontSize: 18, fontWeight: FONT.black, color: COLORS.white, textAlign: 'center', marginBottom: 8 },
   emptySub:        { fontSize: 14, color: COLORS.gray400, textAlign: 'center', marginBottom: 24, lineHeight: 20 },
   emptyBtn:        { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingHorizontal: 32, paddingVertical: 14 },
   emptyBtnTxt:     { color: COLORS.white, fontWeight: FONT.black, fontSize: 15 },
-  emptyOrders:     { alignItems: 'center', paddingVertical: 24, backgroundColor: COLORS.white, borderRadius: RADIUS.lg, borderWidth: 0.5, borderColor: COLORS.border },
+  emptyOrders:     { alignItems: 'center', paddingVertical: 24, backgroundColor: COLORS.white, borderRadius: RADIUS.lg, gap: 4, ...SHADOW.card },
   emptyOrdersTxt:  { fontSize: 14, fontWeight: FONT.black, color: COLORS.gray800, marginBottom: 4 },
   emptyOrdersSub:  { fontSize: 12, color: COLORS.gray400, textAlign: 'center', paddingHorizontal: 20, lineHeight: 18 },
-  storeCard:       { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: COLORS.white, padding: SPACING.lg, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
+  storeCard:       { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: COLORS.white, padding: SPACING.lg },
   storeAvatar:     { width: 64, height: 64, backgroundColor: COLORS.primaryLight, borderRadius: RADIUS.xl, alignItems: 'center', justifyContent: 'center' },
   storeLogoImg:    { width: 64, height: 64, borderRadius: RADIUS.xl },
   storeNameRow:    { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' },
   storeName:       { fontSize: 18, fontWeight: FONT.black, color: COLORS.gray800 },
   verifiedBadge:   { backgroundColor: COLORS.primary, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  verifiedTxt:     { color: '#fff', fontSize: 10, fontWeight: FONT.black },
   premiumBadge:    { backgroundColor: COLORS.amberLight, borderRadius: RADIUS.sm, paddingHorizontal: 6, paddingVertical: 2 },
   premiumTxt:      { color: COLORS.amber, fontSize: 9, fontWeight: FONT.black },
-  storeLocation:   { fontSize: 12, color: COLORS.gray400, marginBottom: 4 },
+  storeLocationRow:{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
+  storeLocation:   { fontSize: 12, color: COLORS.gray400 },
   storeDesc:       { fontSize: 12, color: COLORS.gray600, lineHeight: 17 },
-  actionsRow:      { flexDirection: 'row', backgroundColor: COLORS.white, borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
+  actionsRow:      { flexDirection: 'row', backgroundColor: COLORS.white, marginBottom: SPACING.sm, ...SHADOW.card },
   actionBtn:       { flex: 1, alignItems: 'center', paddingVertical: SPACING.lg, borderRightWidth: 0.5, borderRightColor: COLORS.border },
+  actionIconWrap:  { width: 44, height: 44, borderRadius: RADIUS.full, backgroundColor: COLORS.primaryLight, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
   actionLabel:     { fontSize: 11, fontWeight: FONT.bold, color: COLORS.gray600, textAlign: 'center' },
   section:         { padding: SPACING.lg },
   sectionHeader:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md },
-  sectionTitle:    { fontSize: 16, fontWeight: FONT.black, color: COLORS.gray800, marginBottom: SPACING.md },
-  sectionLink:     { fontSize: 13, color: COLORS.primary, fontWeight: FONT.bold },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: SPACING.md },
+  sectionTitle:    { fontSize: 16, fontWeight: FONT.black, color: COLORS.white },
+  sectionLink:     { fontSize: 13, color: COLORS.primaryMid, fontWeight: FONT.bold },
   statsGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  statCard:        { width: '30%', backgroundColor: COLORS.white, borderRadius: RADIUS.lg, padding: SPACING.md, alignItems: 'center', borderWidth: 0.5, borderColor: COLORS.border, ...SHADOW.card },
+  statCard:        { width: '30%', backgroundColor: COLORS.white, borderRadius: RADIUS.lg, padding: SPACING.md, alignItems: 'center', ...SHADOW.card },
   statVal:         { fontSize: 18, fontWeight: FONT.black, color: COLORS.primary, marginBottom: 4 },
+  statValRow:      { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
   statLbl:         { fontSize: 11, color: COLORS.gray400, textAlign: 'center' },
-  orderCard:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.white, borderRadius: RADIUS.lg, padding: SPACING.md, marginBottom: SPACING.sm, borderWidth: 0.5, borderColor: COLORS.border, ...SHADOW.card },
+  orderCard:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.white, borderRadius: RADIUS.lg, padding: SPACING.md, marginBottom: SPACING.sm, ...SHADOW.card },
   orderLeft:       { flex: 1 },
   orderBuyer:      { fontSize: 14, fontWeight: FONT.bold, color: COLORS.gray800 },
   orderEmail:      { fontSize: 11, color: COLORS.gray400, marginTop: 2 },
@@ -526,26 +576,28 @@ const sd = StyleSheet.create({
   orderStatus:     { borderRadius: RADIUS.full, paddingHorizontal: 8, paddingVertical: 3 },
   orderStatusTxt:  { fontSize: 11, fontWeight: FONT.bold },
   tipCard:         { flexDirection: 'row', gap: 12, backgroundColor: COLORS.primaryLight, marginHorizontal: SPACING.lg, borderRadius: RADIUS.xl, padding: SPACING.lg },
-  tipIcon:         { fontSize: 24 },
+  tipIconWrap:     { width: 40, height: 40, borderRadius: RADIUS.full, backgroundColor: COLORS.white, alignItems: 'center', justifyContent: 'center' },
   tipTitle:        { fontSize: 13, fontWeight: FONT.black, color: COLORS.primaryDark, marginBottom: 4 },
   tipTxt:          { fontSize: 12, color: COLORS.primary, lineHeight: 18 },
-  fab:             { position: 'absolute', right: SPACING.lg, backgroundColor: COLORS.primary, borderRadius: RADIUS.full, paddingHorizontal: 20, paddingVertical: 14, ...SHADOW.strong },
+  fab:             { position: 'absolute', right: SPACING.lg, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: COLORS.primary, borderRadius: RADIUS.full, paddingHorizontal: 20, paddingVertical: 14, ...SHADOW.strong },
   fabTxt:          { color: COLORS.white, fontWeight: FONT.black, fontSize: 14 },
   // ── ESTADOS PENDING/REJECTED ──
   statusWrap:      { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.lg, paddingTop: 40 },
-  statusTitle:     { fontSize: 19, fontWeight: FONT.black, color: COLORS.gray800, textAlign: 'center', marginBottom: 10 },
+  statusIconWrap:  { width: 76, height: 76, borderRadius: RADIUS.full, backgroundColor: COLORS.amberLight, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  statusTitle:     { fontSize: 19, fontWeight: FONT.black, color: COLORS.white, textAlign: 'center', marginBottom: 10 },
   statusSub:       { fontSize: 13, color: COLORS.gray400, textAlign: 'center', lineHeight: 20, marginBottom: 24, paddingHorizontal: 10 },
-  statusCard:      { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: COLORS.white, borderRadius: RADIUS.xl, padding: SPACING.lg, width: '100%', borderWidth: 0.5, borderColor: COLORS.border, marginBottom: SPACING.md, ...SHADOW.card },
+  statusCard:      { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: COLORS.white, borderRadius: RADIUS.xl, padding: SPACING.lg, width: '100%', marginBottom: SPACING.md, ...SHADOW.card },
   statusLogoImg:   { width: 52, height: 52, borderRadius: RADIUS.lg },
   statusCardName:  { fontSize: 15, fontWeight: FONT.black, color: COLORS.gray800, marginBottom: 2 },
-  statusCardSub:   { fontSize: 12, color: COLORS.gray400, marginBottom: 6 },
-  statusBadgePending: { backgroundColor: COLORS.amberLight, borderRadius: RADIUS.full, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start' },
+  statusCardSubRow:{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
+  statusCardSub:   { fontSize: 12, color: COLORS.gray400 },
+  statusBadgePending: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.amberLight, borderRadius: RADIUS.full, paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start' },
   statusBadgeTxt:  { fontSize: 11, color: COLORS.amber, fontWeight: FONT.bold },
   statusInfoCard:  { backgroundColor: COLORS.blueLight, borderRadius: RADIUS.lg, padding: SPACING.md, width: '100%', marginBottom: SPACING.lg },
   statusInfoTxt:   { fontSize: 12, color: COLORS.blue, lineHeight: 18 },
-  statusEditBtn:   { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: 14, paddingHorizontal: 24, width: '100%', alignItems: 'center', ...SHADOW.strong },
+  statusEditBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: 14, paddingHorizontal: 24, width: '100%', ...SHADOW.strong },
   statusEditBtnTxt:{ color: '#fff', fontSize: 14, fontWeight: FONT.black },
-  rejectionCard:   { backgroundColor: '#FFF5F5', borderRadius: RADIUS.lg, padding: SPACING.lg, width: '100%', marginBottom: SPACING.lg, borderWidth: 1, borderColor: '#FFD0D0' },
-  rejectionTitle:  { fontSize: 13, fontWeight: FONT.black, color: COLORS.red, marginBottom: 6 },
+  rejectionCard:   { backgroundColor: COLORS.redLight, borderRadius: RADIUS.lg, padding: SPACING.lg, width: '100%', marginBottom: SPACING.lg },
+  rejectionTitle:  { fontSize: 13, fontWeight: FONT.black, color: COLORS.primary, marginBottom: 6 },
   rejectionTxt:    { fontSize: 13, color: COLORS.gray600, lineHeight: 20 },
 });
