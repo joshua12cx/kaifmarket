@@ -1,159 +1,57 @@
 // src/screens/FavoritesScreen.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Image, ActivityIndicator, RefreshControl, StatusBar,
+  View, Text, TouchableOpacity, StyleSheet,
+  ActivityIndicator, RefreshControl, StatusBar, ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  Heart, Star, ShoppingCart, Store, Trash2, Package,
-} from 'lucide-react-native';
-import { COLORS, SPACING, RADIUS, FONT, SHADOW } from '../theme';
-import { PRODUCTS, SELLERS } from '../data';
-import { useFavs, useCart, useAuth } from '../context';
+import { Heart } from 'lucide-react-native';
+import { COLORS, SPACING, RADIUS, FONT } from '../theme';
+import { useFavs } from '../context';
 import { supabase } from '../lib/supabase';
+import ProductCard from '../components/ProductCard';
 
 export default function FavoritesScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  const { favs, toggle, favCount } = useFavs();
-  const { dispatch } = useCart();
-  const { user } = useAuth();
+  const { favs, favCount } = useFavs();
 
-  const [supabaseProds, setSupabaseProds] = useState<Record<string, any>>({});
-  const [supabaseSellers, setSupabaseSellers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // ── Cargar productos y vendedores de Supabase ─────────────────
-  const fetchData = useCallback(async () => {
+  const favIds = Object.keys(favs).filter(id => favs[id]);
+  const favIdsKey = favIds.slice().sort().join(',');
+
+  // ── Solo productos reales de Supabase, sin data sintética ──────
+  const fetchFavorites = useCallback(async () => {
+    if (favIds.length === 0) { setProducts([]); setLoading(false); setRefreshing(false); return; }
     try {
-      const stringIds = Object.keys(favs).filter(id =>
-        favs[id] && isNaN(Number(id))
-      );
-      if (stringIds.length > 0) {
-        const { data } = await supabase
-          .from('products')
-          .select('*')
-          .in('id', stringIds);
-
-        if (data) {
-          const map: Record<string, any> = {};
-          data.forEach((p: any) => { map[p.id] = p; });
-          setSupabaseProds(map);
-        }
-      }
-
-      const { data: sellersData } = await supabase
-        .from('sellers')
+      const { data, error } = await supabase
+        .from('products')
         .select('*')
-        .order('created_at', { ascending: false });
+        .in('id', favIds);
 
-      setSupabaseSellers(sellersData || []);
-
+      if (__DEV__) { console.log('[FAVS] fetch:', { count: data?.length, error }); }
+      setProducts(data || []);
     } catch (e) {
-      if (__DEV__) { console.log('[FAVS] Error:', e); }
+      if (__DEV__) { console.log('[FAVS] fetch error:', e); }
+      setProducts([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [favs]);
+  }, [favIdsKey]);
 
-  useEffect(() => {
-    setLoading(true);
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { setLoading(true); fetchFavorites(); }, [fetchFavorites]);
 
-  const onRefresh = () => { setRefreshing(true); fetchData(); };
-
-  // ── Construir lista de favoritos ──────────────────────────────
-  const favProducts = Object.keys(favs)
-    .filter(id => favs[id])
-    .map(id => {
-      const isString = isNaN(Number(id));
-      const raw = isString
-        ? supabaseProds[id]
-        : PRODUCTS.find(p => p.id === Number(id));
-      if (!raw) { return null; }
-      return {
-        ...raw,
-        bgColor: raw.bgColor || raw.bg_color || COLORS.gray100,
-        oldPrice: raw.oldPrice || raw.old_price || null,
-        imageUrl: raw.image_url || null,
-        emoji: raw.emoji || '📦',
-        reviews: raw.reviews || raw.review_count || 0,
-      };
-    })
-    .filter(Boolean) as any[];
-
-  // ── Combinar vendedores Supabase + estáticos sin duplicados ───
-  const staticSellerIds = new Set(supabaseSellers.map((s: any) => s.user_id));
-  const allSellers = [
-    ...supabaseSellers,
-    ...SELLERS.filter(s => !staticSellerIds.has(s.id)),
-  ];
-
-  const recommendedProducts = PRODUCTS
-    .filter(p => !favs[p.id] && p.tag === 'hot')
-    .slice(0, 6);
-
-  // ── Card de producto ──────────────────────────────────────────
-  const ProductCard = ({ product }: { product: any }) => {
-    const disc = product.oldPrice
-      ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100)
-      : null;
-    const isFavd = !!favs[String(product.id)];
-
-    return (
-      <TouchableOpacity
-        style={fs.card}
-        onPress={() => navigation.navigate('ProductDetail', { productId: product.id })}
-        activeOpacity={0.9}>
-        <View style={[fs.cardImg, { backgroundColor: product.imageUrl ? COLORS.gray200 : product.bgColor }]}>
-          {product.imageUrl ? (
-            <Image source={{ uri: product.imageUrl }} style={fs.cardImgReal} resizeMode="cover" />
-          ) : (
-            <Package size={40} color={COLORS.gray400} strokeWidth={1.5} />
-          )}
-          {disc && (
-            <View style={fs.discBadge}>
-              <Text style={fs.discTxt}>-{disc}%</Text>
-            </View>
-          )}
-          <TouchableOpacity style={fs.favBtn} onPress={() => toggle(product.id)}>
-            <Heart
-              size={15}
-              color={isFavd ? COLORS.primary : COLORS.white}
-              fill={isFavd ? COLORS.primary : 'transparent'}
-              strokeWidth={2}
-            />
-          </TouchableOpacity>
-        </View>
-        <View style={fs.cardInfo}>
-          <View style={fs.priceRow}>
-            <Text style={fs.price}>S/ {product.price}</Text>
-            {product.oldPrice && <Text style={fs.oldPrice}>S/ {product.oldPrice}</Text>}
-          </View>
-          <Text style={fs.name} numberOfLines={2}>{product.name}</Text>
-          <View style={fs.ratingRow}>
-            <Star size={11} color={COLORS.gold} fill={COLORS.gold} strokeWidth={0} />
-            <Text style={fs.stars}>{product.rating || 5} ({product.reviews || 0})</Text>
-          </View>
-          <TouchableOpacity
-            style={fs.addBtn}
-            onPress={() => dispatch({ type: 'ADD', id: product.id })}>
-            <ShoppingCart size={13} color={COLORS.black} strokeWidth={2} />
-            <Text style={fs.addBtnTxt}>Al carrito</Text>
-          </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  const onRefresh = () => { setRefreshing(true); fetchFavorites(); };
 
   return (
     <View style={[fs.container, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.black} />
+
       <View style={fs.header}>
-        <Text style={fs.headerTitle}>Favoritos</Text>
+        <Text style={fs.headerTitle}>Mis Favoritos</Text>
         {favCount > 0 && (
           <Text style={fs.headerCount}>{favCount} producto{favCount > 1 ? 's' : ''}</Text>
         )}
@@ -163,118 +61,34 @@ export default function FavoritesScreen({ navigation }: any) {
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
+      ) : products.length === 0 ? (
+        <View style={fs.empty}>
+          <View style={fs.emptyIconWrap}>
+            <Heart size={40} color={COLORS.gray600} strokeWidth={1.5} />
+          </View>
+          <Text style={fs.emptyTitle}>Sin favoritos aún</Text>
+          <Text style={fs.emptySub}>Toca el ♥ en los productos que te gusten</Text>
+          <TouchableOpacity
+            style={fs.emptyBtn}
+            onPress={() => navigation.navigate('HomeMain')}>
+            <Text style={fs.emptyBtnTxt}>Explorar productos</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={[COLORS.primary]}
-              tintColor={COLORS.primary}
-            />
-          }>
-
-          {/* ── VACÍO ── */}
-          {favProducts.length === 0 && (
-            <View style={fs.emptySection}>
-              <View style={fs.emptyIconWrap}>
-                <Heart size={40} color={COLORS.gray400} strokeWidth={1.5} />
-              </View>
-              <Text style={fs.emptyTitle}>En favoritos aún no hay nada</Text>
-              <Text style={fs.emptySub}>
-                Toca el corazón en cualquier producto para guardarlo aquí
-              </Text>
-              <TouchableOpacity
-                style={fs.emptyBtn}
-                onPress={() => navigation.navigate('HomeMain')}>
-                <Text style={fs.emptyBtnTxt}>Explorar productos</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* ── LISTA DE FAVORITOS ── */}
-          {favProducts.length > 0 && (
-            <View style={fs.section}>
-              <View style={fs.sectionHeader}>
-                <Text style={fs.sectionTitle}>Mis favoritos</Text>
-                <TouchableOpacity
-                  style={fs.clearBtn}
-                  onPress={() => {
-                    Object.keys(favs).filter(id => favs[id]).forEach(id => toggle(id));
-                  }}>
-                  <Trash2 size={13} color={COLORS.primary} strokeWidth={2} />
-                  <Text style={fs.clearTxt}>Limpiar</Text>
-                </TouchableOpacity>
-              </View>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ gap: 10 }}>
-                {favProducts.map(product => (
-                  <ProductCard key={String(product.id)} product={product} />
-                ))}
-              </ScrollView>
-            </View>
-          )}
-
-          {/* ── TIENDAS Y MARCAS ── */}
-          <View style={fs.section}>
-            <View style={fs.sectionHeader}>
-              <Text style={fs.sectionTitle}>Tiendas y marcas</Text>
-              <Text style={fs.sectionSub}>Compras similares anteriores</Text>
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 10 }}>
-              {allSellers.map((seller: any) => (
-                <TouchableOpacity
-                  key={String(seller.id)}
-                  style={fs.sellerCard}
-                  onPress={() => navigation.navigate('SellerStore', { sellerId: seller.id })}
-                  activeOpacity={0.85}>
-                  {seller.logo_url ? (
-                    <Image
-                      source={{ uri: seller.logo_url }}
-                      style={fs.sellerLogoImg}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={fs.sellerAvatar}>
-                      <Store size={22} color={COLORS.primary} strokeWidth={1.8} />
-                    </View>
-                  )}
-                  <Text style={fs.sellerName} numberOfLines={1}>{seller.name}</Text>
-                  <Text style={fs.sellerDisc}>-20%</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+          contentContainerStyle={{ padding: SPACING.lg, paddingBottom: 40 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}>
+          <View style={fs.grid}>
+            {products.map((p, i) => (
+              <ProductCard
+                key={`${p.id}-${i}`}
+                product={p}
+                style={fs.gridItem}
+                onPress={() => navigation.navigate('ProductDetail', { productId: p.id })}
+              />
+            ))}
           </View>
-
-          {/* ── RECOMENDADOS ── */}
-          {recommendedProducts.length > 0 && (
-            <View style={fs.section}>
-              <Text style={fs.sectionTitle}>Merecen tu primer corazón</Text>
-              <View style={fs.grid}>
-                {recommendedProducts.map(product => (
-                  <ProductCard
-                    key={product.id}
-                    product={{
-                      ...product,
-                      bgColor: product.bgColor || COLORS.gray100,
-                      oldPrice: product.oldPrice || null,
-                      imageUrl: null,
-                      emoji: product.emoji || '📦',
-                      reviews: product.reviews || 0,
-                    }}
-                  />
-                ))}
-              </View>
-            </View>
-          )}
-
-          <View style={{ height: 40 }} />
         </ScrollView>
       )}
     </View>
@@ -282,41 +96,18 @@ export default function FavoritesScreen({ navigation }: any) {
 }
 
 const fs = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.black },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14, backgroundColor: COLORS.primary },
-  headerTitle: { fontSize: 20, fontWeight: FONT.black, color: COLORS.white },
-  headerCount: { fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: FONT.semibold },
-  emptySection: { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 40 },
+  container:     { flex: 1, backgroundColor: COLORS.black },
+  header:        { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, paddingBottom: SPACING.md },
+  headerTitle:   { fontSize: 22, fontWeight: FONT.black, color: COLORS.white },
+  headerCount:   { fontSize: 13, color: COLORS.gray400, fontWeight: FONT.semibold },
+
+  empty:         { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
   emptyIconWrap: { width: 80, height: 80, borderRadius: RADIUS.full, backgroundColor: COLORS.blackSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  emptyTitle: { fontSize: 18, fontWeight: FONT.black, color: COLORS.white, textAlign: 'center', marginBottom: 8 },
-  emptySub: { fontSize: 14, color: COLORS.gray400, textAlign: 'center', marginBottom: 24 },
-  emptyBtn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingHorizontal: 28, paddingVertical: 12 },
-  emptyBtnTxt: { color: '#fff', fontWeight: FONT.black, fontSize: 14 },
-  section: { padding: SPACING.lg, paddingBottom: SPACING.sm },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  sectionTitle: { fontSize: 16, fontWeight: FONT.black, color: COLORS.white, marginBottom: 4 },
-  sectionSub: { fontSize: 12, color: COLORS.gray400 },
-  clearBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  clearTxt: { fontSize: 13, color: COLORS.primaryMid, fontWeight: FONT.bold },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  card: { width: 160, backgroundColor: COLORS.white, borderRadius: RADIUS.lg, overflow: 'hidden', ...SHADOW.card },
-  cardImg: { height: 130, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  cardImgReal: { width: '100%', height: '100%', position: 'absolute' },
-  discBadge: { position: 'absolute', top: 8, left: 8, backgroundColor: COLORS.red, borderRadius: RADIUS.sm, paddingHorizontal: 6, paddingVertical: 2 },
-  discTxt: { color: '#fff', fontSize: 10, fontWeight: FONT.black },
-  favBtn: { position: 'absolute', top: 6, right: 6, width: 26, height: 26, borderRadius: RADIUS.full, backgroundColor: 'rgba(0,0,0,0.28)', alignItems: 'center', justifyContent: 'center' },
-  cardInfo: { padding: SPACING.sm },
-  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 3 },
-  price: { fontSize: 16, fontWeight: FONT.black, color: COLORS.gray800 },
-  oldPrice: { fontSize: 11, color: COLORS.gray400, textDecorationLine: 'line-through' },
-  name: { fontSize: 12, color: COLORS.gray600, lineHeight: 16, marginBottom: 4 },
-  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 8 },
-  stars: { fontSize: 11, color: COLORS.gray600, fontWeight: FONT.semibold },
-  addBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: COLORS.gold, borderRadius: RADIUS.md, paddingVertical: 7 },
-  addBtnTxt: { fontSize: 12, fontWeight: FONT.black, color: COLORS.black },
-  sellerCard: { width: 110, backgroundColor: COLORS.white, borderRadius: RADIUS.lg, padding: SPACING.md, alignItems: 'center', ...SHADOW.card },
-  sellerAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: COLORS.primaryLight, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
-  sellerLogoImg: { width: 52, height: 52, borderRadius: 26, marginBottom: 6 },
-  sellerName: { fontSize: 11, fontWeight: FONT.bold, color: COLORS.gray800, textAlign: 'center', marginBottom: 4 },
-  sellerDisc: { fontSize: 12, fontWeight: FONT.black, color: COLORS.primary },
+  emptyTitle:    { fontSize: 18, fontWeight: FONT.black, color: COLORS.white, marginBottom: 8 },
+  emptySub:      { fontSize: 14, color: COLORS.gray400, textAlign: 'center', marginBottom: 24 },
+  emptyBtn:      { backgroundColor: COLORS.primary, borderRadius: RADIUS.full, paddingHorizontal: 28, paddingVertical: 13 },
+  emptyBtnTxt:   { color: '#fff', fontWeight: FONT.black, fontSize: 14 },
+
+  grid:          { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  gridItem:      { width: '47.5%' },
 });

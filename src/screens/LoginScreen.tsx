@@ -1,13 +1,15 @@
 // src/screens/LoginScreen.tsx
 import React, { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity,
+  View, Text, TextInput, TouchableOpacity, Image,
   StyleSheet, KeyboardAvoidingView, Platform,
-  ScrollView, ActivityIndicator, Alert,
+  ScrollView, ActivityIndicator, Alert, StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, SPACING, RADIUS, FONT, SHADOW } from '../theme';
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
+import { COLORS, SPACING, RADIUS, FONT } from '../theme';
 import { useAuth } from '../context';
+import AuthToggle from '../components/AuthToggle';
 
 export default function LoginScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -40,167 +42,157 @@ export default function LoginScreen({ navigation }: any) {
 
     if (result.error) {
       Alert.alert('Error al ingresar', result.error);
-    } else {
-      // Login exitoso → ir al Home
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'HomeTab' }],
-      });
     }
+    // Si fue exitoso no hace falta navegar a mano: AppNavigator detecta
+    // isAuthenticated === true y cambia solo hacia RoleSelection → Main.
   };
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1 }}
+      style={{ flex: 1, backgroundColor: COLORS.black }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.black} />
 
       <ScrollView
         style={s.container}
-        contentContainerStyle={[s.content, { paddingTop: insets.top + 20 }]}
+        contentContainerStyle={[s.content, { paddingTop: insets.top + 24 }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
 
-        {/* ── HEADER ── */}
+        {/* ── LOGO ── */}
         <View style={s.header}>
-          <View style={s.logoWrap}>
-            <View style={s.logoIcon}>
-              <Text style={{ fontSize: 36 }}>🐦</Text>
-            </View>
-          </View>
-          <Text style={s.title}>KaifMarket</Text>
-          <Text style={s.subtitle}>Tu marketplace peruano 🇵🇪</Text>
+          <Image
+            source={require('../assets/logo-horizontal.png')}
+            style={s.logo}
+            resizeMode="contain"
+          />
         </View>
+
+        <Text style={s.title}>Bienvenido de nuevo</Text>
+        <Text style={s.subtitle}>Inicia sesión para continuar</Text>
+
+        <AuthToggle
+          active="login"
+          onChange={tab => { if (tab === 'register') { navigation.replace('Register'); } }}
+        />
 
         {/* ── FORM ── */}
-        <View style={s.form}>
-          <Text style={s.formTitle}>Iniciar sesión</Text>
-
-          {/* Email */}
-          <View style={s.fieldWrap}>
-            <Text style={s.label}>Email</Text>
-            <View style={[s.inputWrap, errors.email && s.inputError]}>
-              <Text style={s.inputIcon}>📧</Text>
-              <TextInput
-                style={s.input}
-                placeholder="tu@email.com"
-                placeholderTextColor={COLORS.gray400}
-                value={email}
-                onChangeText={t => { setEmail(t); setErrors(e => ({ ...e, email: '' })); }}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
-            {errors.email ? <Text style={s.errorTxt}>{errors.email}</Text> : null}
+        <View style={s.fieldWrap}>
+          <Text style={s.label}>Correo electrónico</Text>
+          <View style={[s.inputWrap, errors.email && s.inputError]}>
+            <Mail size={18} color={COLORS.gray400} />
+            <TextInput
+              style={s.input}
+              placeholder="correo@ejemplo.com"
+              placeholderTextColor={COLORS.gray400}
+              value={email}
+              onChangeText={t => { setEmail(t); setErrors(e => ({ ...e, email: '' })); }}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
           </View>
-
-          {/* Contraseña */}
-          <View style={s.fieldWrap}>
-            <Text style={s.label}>Contraseña</Text>
-            <View style={[s.inputWrap, errors.password && s.inputError]}>
-              <Text style={s.inputIcon}>🔒</Text>
-              <TextInput
-                style={s.input}
-                placeholder="Tu contraseña"
-                placeholderTextColor={COLORS.gray400}
-                value={password}
-                onChangeText={t => { setPassword(t); setErrors(e => ({ ...e, password: '' })); }}
-                secureTextEntry={!showPass}
-                autoCapitalize="none"
-              />
-              <TouchableOpacity onPress={() => setShowPass(v => !v)}>
-                <Text style={{ fontSize: 18 }}>{showPass ? '🙈' : '👁️'}</Text>
-              </TouchableOpacity>
-            </View>
-            {errors.password ? <Text style={s.errorTxt}>{errors.password}</Text> : null}
-          </View>
-
-          {/* Olvidé contraseña */}
-          <TouchableOpacity
-            style={s.forgotWrap}
-            onPress={() => Alert.alert('Recuperar contraseña', 'Te enviaremos un email para restablecer tu contraseña.\n\nPróximamente disponible.')}>
-            <Text style={s.forgotTxt}>¿Olvidaste tu contraseña?</Text>
-          </TouchableOpacity>
-
-          {/* Botón login */}
-          <TouchableOpacity
-            style={[s.loginBtn, loading && { opacity: 0.7 }]}
-            onPress={handleLogin}
-            disabled={loading}
-            activeOpacity={0.85}>
-            {loading
-              ? <ActivityIndicator color={COLORS.white} size="small" />
-              : <Text style={s.loginBtnTxt}>Ingresar →</Text>}
-          </TouchableOpacity>
-
-          {/* Divider */}
-          <View style={s.divider}>
-            <View style={s.dividerLine} />
-            <Text style={s.dividerTxt}>o</Text>
-            <View style={s.dividerLine} />
-          </View>
-
-          {/* Continuar sin cuenta */}
-          <TouchableOpacity
-            style={s.guestBtn}
-            onPress={() => navigation.navigate('HomeTab')}
-            activeOpacity={0.8}>
-            <Text style={s.guestBtnTxt}>Continuar sin cuenta</Text>
-          </TouchableOpacity>
+          {errors.email ? <Text style={s.errorTxt}>{errors.email}</Text> : null}
         </View>
+
+        <View style={s.fieldWrap}>
+          <Text style={s.label}>Contraseña</Text>
+          <View style={[s.inputWrap, errors.password && s.inputError]}>
+            <Lock size={18} color={COLORS.gray400} />
+            <TextInput
+              style={s.input}
+              placeholder="••••••••"
+              placeholderTextColor={COLORS.gray400}
+              value={password}
+              onChangeText={t => { setPassword(t); setErrors(e => ({ ...e, password: '' })); }}
+              secureTextEntry={!showPass}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity onPress={() => setShowPass(v => !v)}>
+              {showPass
+                ? <EyeOff size={18} color={COLORS.gray400} />
+                : <Eye size={18} color={COLORS.gray400} />}
+            </TouchableOpacity>
+          </View>
+          {errors.password ? <Text style={s.errorTxt}>{errors.password}</Text> : null}
+        </View>
+
+        <TouchableOpacity
+          style={s.forgotWrap}
+          onPress={() => Alert.alert(
+            'Recuperar contraseña',
+            'Te enviaremos un email para restablecer tu contraseña.\n\nPróximamente disponible.',
+          )}>
+          <Text style={s.forgotTxt}>¿Olvidaste tu contraseña?</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[s.loginBtn, loading && { opacity: 0.7 }]}
+          onPress={handleLogin}
+          disabled={loading}
+          activeOpacity={0.85}>
+          {loading
+            ? <ActivityIndicator color={COLORS.white} size="small" />
+            : <Text style={s.loginBtnTxt}>Iniciar sesión</Text>}
+        </TouchableOpacity>
+
+        {/* ── DIVIDER ── */}
+        <View style={s.divider}>
+          <View style={s.dividerLine} />
+          <Text style={s.dividerTxt}>o continúa con</Text>
+          <View style={s.dividerLine} />
+        </View>
+
+        {/* ── GOOGLE — pendiente de implementar ── */}
+        <TouchableOpacity
+          style={s.googleBtn}
+          onPress={() => Alert.alert('Muy pronto', 'El inicio de sesión con Google estará disponible próximamente.')}
+          activeOpacity={0.8}>
+          <Text style={s.googleG}>G</Text>
+          <Text style={s.googleTxt}>Continuar con Google</Text>
+        </TouchableOpacity>
 
         {/* ── REGISTRO ── */}
         <View style={s.registerWrap}>
           <Text style={s.registerTxt}>¿No tienes cuenta? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-            <Text style={s.registerLink}>Regístrate gratis</Text>
+          <TouchableOpacity onPress={() => navigation.replace('Register')}>
+            <Text style={s.registerLink}>Regístrate</Text>
           </TouchableOpacity>
         </View>
 
-        {/* ── INFO ── */}
-        <View style={s.infoWrap}>
-          <Text style={s.infoTxt}>
-            Al ingresar aceptas nuestros{' '}
-            <Text style={{ color: COLORS.primary }}>Términos de uso</Text>
-            {' '}y{' '}
-            <Text style={{ color: COLORS.primary }}>Política de privacidad</Text>
-          </Text>
-        </View>
-
+        <View style={{ height: 24 }} />
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.white },
+  container: { flex: 1, backgroundColor: COLORS.black },
   content: { paddingHorizontal: SPACING.lg, paddingBottom: 40 },
-  header: { alignItems: 'center', marginBottom: 32 },
-  logoWrap: { marginBottom: 12 },
-  logoIcon: { width: 80, height: 80, backgroundColor: COLORS.primaryLight, borderRadius: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: COLORS.primary },
-  title: { fontSize: 28, fontWeight: FONT.black, color: COLORS.gray800, letterSpacing: -0.5 },
-  subtitle: { fontSize: 14, color: COLORS.gray400, fontWeight: FONT.semibold, marginTop: 4 },
-  form: { backgroundColor: COLORS.white, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.lg, borderWidth: 1, borderColor: COLORS.border, ...SHADOW.card },
-  formTitle: { fontSize: 20, fontWeight: FONT.black, color: COLORS.gray800, marginBottom: SPACING.lg },
+  header: { alignItems: 'center', marginBottom: SPACING.lg },
+  logo: { width: 220, height: 146 },
+  title: { fontSize: 22, fontWeight: FONT.black, color: COLORS.white, textAlign: 'center', letterSpacing: -0.3 },
+  subtitle: { fontSize: 14, color: COLORS.gray400, fontWeight: FONT.semibold, textAlign: 'center', marginTop: 4, marginBottom: SPACING.xl },
   fieldWrap: { marginBottom: SPACING.md },
-  label: { fontSize: 13, fontWeight: FONT.bold, color: COLORS.gray600, marginBottom: 6 },
-  inputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: COLORS.border, borderRadius: RADIUS.lg, paddingHorizontal: SPACING.md, paddingVertical: 12, gap: 10, backgroundColor: COLORS.gray50 },
+  label: { fontSize: 13, fontWeight: FONT.semibold, color: COLORS.gray400, marginBottom: 6 },
+  inputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: COLORS.blackSoft, borderRadius: RADIUS.lg, paddingHorizontal: SPACING.md, paddingVertical: 13, gap: 10, backgroundColor: COLORS.blackSoft },
   inputError: { borderColor: COLORS.red },
-  input: { flex: 1, fontSize: 15, color: COLORS.gray800, padding: 0 },
-  inputIcon: { fontSize: 18 },
+  input: { flex: 1, fontSize: 15, color: COLORS.white, padding: 0 },
   errorTxt: { fontSize: 12, color: COLORS.red, fontWeight: FONT.semibold, marginTop: 4 },
-  forgotWrap: { alignSelf: 'flex-end', marginBottom: SPACING.lg },
+  forgotWrap: { alignSelf: 'flex-end', marginBottom: SPACING.lg, marginTop: 2 },
   forgotTxt: { fontSize: 13, color: COLORS.primary, fontWeight: FONT.bold },
-  loginBtn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: 15, alignItems: 'center', ...SHADOW.strong },
-  loginBtnTxt: { color: COLORS.white, fontSize: 16, fontWeight: FONT.black, letterSpacing: 0.3 },
-  divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: SPACING.lg },
-  dividerLine: { flex: 1, height: 1, backgroundColor: COLORS.border },
-  dividerTxt: { fontSize: 13, color: COLORS.gray400, fontWeight: FONT.semibold },
-  guestBtn: { borderWidth: 1.5, borderColor: COLORS.border, borderRadius: RADIUS.lg, paddingVertical: 13, alignItems: 'center' },
-  guestBtnTxt: { fontSize: 15, color: COLORS.gray600, fontWeight: FONT.bold },
-  registerWrap: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: SPACING.lg },
+  loginBtn: {
+    backgroundColor: COLORS.primary, borderRadius: RADIUS.full, paddingVertical: 16, alignItems: 'center',
+    shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.45, shadowRadius: 12, elevation: 6,
+  },
+  loginBtnTxt: { color: COLORS.white, fontSize: 16, fontWeight: FONT.black, letterSpacing: 0.2 },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: SPACING.xl },
+  dividerLine: { flex: 1, height: 1, backgroundColor: COLORS.blackSoft },
+  dividerTxt: { fontSize: 12, color: COLORS.gray400, fontWeight: FONT.semibold },
+  googleBtn: { flexDirection: 'row', gap: 10, borderWidth: 1, borderColor: COLORS.blackSoft, backgroundColor: COLORS.blackSoft, borderRadius: RADIUS.full, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
+  googleG: { fontSize: 16, fontWeight: FONT.black, color: COLORS.white },
+  googleTxt: { fontSize: 15, color: COLORS.white, fontWeight: FONT.bold },
+  registerWrap: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: SPACING.xl },
   registerTxt: { fontSize: 14, color: COLORS.gray400 },
   registerLink: { fontSize: 14, color: COLORS.primary, fontWeight: FONT.black },
-  infoWrap: { paddingHorizontal: SPACING.lg },
-  infoTxt: { fontSize: 12, color: COLORS.gray400, textAlign: 'center', lineHeight: 18 },
 });

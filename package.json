@@ -25,6 +25,7 @@
     "react-native-gesture-handler": "^2.31.2",
     "react-native-google-fonts": "^0.0.0",
     "react-native-image-picker": "^8.2.1",
+    "react-native-linear-gradient": "^2.8.3",
     "react-native-safe-area-context": "^5.7.0",
     "react-native-screens": "^4.25.0",
     "react-native-svg": "^15.15.5",

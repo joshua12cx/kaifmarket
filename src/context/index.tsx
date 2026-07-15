@@ -82,14 +82,20 @@ interface AuthContextType {
   logout: () => Promise<void>;
   activatePlus: () => void;
   updateUser: (data: Partial<AuthUser>) => void;
+  // NUEVO: activa la sesión del usuario en el AuthContext sin pasar
+  // por login() — se usa en RegisterSuccessScreen, ya que con la
+  // confirmación de email desactivada, signUp() ya deja una sesión
+  // creada del lado de Supabase, pero el `user` de este contexto
+  // sigue en null hasta que la "hidratamos" explícitamente.
+  hydrateSession: () => Promise<boolean>;
 }
 
 export interface RegisterData {
   name: string;
   email: string;
   password: string;
-  gender: 'male' | 'female' | 'other';
-  isSeller: boolean;
+  gender?: 'male' | 'female' | 'other';
+  isSeller?: boolean;
   phone?: string;
 }
 
@@ -151,6 +157,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // La tienda (sellers) se crea únicamente en SellerRegisterScreen,
   // donde se exige DNI/RUC + documento. Aquí solo guardamos la
   // "intención" de vender (is_seller) para guiar al usuario después.
+  //
+  // NOTA: a propósito NO se llama fetchUserProfile() aquí. Con la
+  // confirmación de email desactivada, Supabase ya deja sesión activa
+  // apenas se registra, pero queremos que la app espere a que el
+  // usuario vea la pantalla de "¡Cuenta creada!" y toque "Elegir mi
+  // rol" antes de considerarlo autenticado — eso es lo que hace
+  // hydrateSession() más abajo.
   const register = async (data: RegisterData) => {
     try {
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -216,6 +229,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // ── Hidratar sesión ─────────────────────────────────────────────
+  // Llamado desde RegisterSuccessScreen al tocar "Elegir mi rol".
+  // Lee la sesión que Supabase ya dejó activa tras signUp() y recién
+  // ahí llena `user` en este contexto → dispara isAuthenticated=true
+  // → el AppNavigator cambia solo hacia RoleSelectionScreen.
+  const hydrateSession = async (): Promise<boolean> => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        await fetchUserProfile(session.user.id);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      if (__DEV__) { console.log('[AUTH] hydrateSession error:', e); }
+      return false;
+    }
+  };
+
   const logout = async () => {
     try { await supabase.auth.signOut(); }
     catch (e) { if (__DEV__) { console.log('[AUTH] Logout error:', e); } }
@@ -243,6 +275,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout,
       activatePlus,
       updateUser,
+      hydrateSession,
     }}>
       {children}
     </AuthContext.Provider>

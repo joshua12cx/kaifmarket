@@ -11,7 +11,7 @@ import RNFS from 'react-native-fs';
 import {
   ChevronLeft, Store, Pencil, AlertTriangle, Power,
 } from 'lucide-react-native';
-import { COLORS, SPACING, RADIUS, FONT, SHADOW } from '../theme';
+import { COLORS, SPACING, RADIUS, FONT } from '../theme';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context';
 import { getCategoryIcon } from '../utils/categoryIcons';
@@ -113,7 +113,6 @@ export default function SellerEditStore({ route, navigation }: any) {
     setLoading(true);
 
     try {
-      // Subir nuevo logo si cambió
       let logoUrl = seller?.logo_url || null;
       if (newLogoUri) {
         const uploaded = await uploadLogo(newLogoUri);
@@ -155,12 +154,12 @@ export default function SellerEditStore({ route, navigation }: any) {
 
   return (
     <View style={[es.container, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.black} />
       <View style={es.header}>
         <TouchableOpacity style={es.backBtn} onPress={() => navigation.goBack()}>
           <ChevronLeft size={22} color={COLORS.white} strokeWidth={2.5} />
         </TouchableOpacity>
-        <Text style={es.headerTitle}>Editar tienda</Text>
+        <Text style={es.headerTitle}>Perfil de tienda</Text>
         <View style={{ width: 36 }} />
       </View>
 
@@ -177,12 +176,12 @@ export default function SellerEditStore({ route, navigation }: any) {
               <>
                 <Image source={{ uri: logoUri }} style={es.logoImg} />
                 <View style={es.logoEditBadge}>
-                  <Pencil size={13} color="#fff" strokeWidth={2.5} />
+                  <Pencil size={13} color={COLORS.black} strokeWidth={2.5} />
                 </View>
               </>
             ) : (
               <View style={es.logoPlaceholder}>
-                <Store size={32} color={COLORS.primary} strokeWidth={1.8} />
+                <Store size={32} color={COLORS.gold} strokeWidth={1.8} />
                 <Text style={es.logoHint}>Toca para subir logo</Text>
               </View>
             )}
@@ -273,7 +272,7 @@ export default function SellerEditStore({ route, navigation }: any) {
                   style={[es.catBtn, active && es.catBtnActive]}
                   onPress={() => { setCategory(cat.id); setErrors(e => ({ ...e, category: '' })); }}
                   activeOpacity={0.8}>
-                  <Icon size={24} color={active ? COLORS.primary : COLORS.gray600} strokeWidth={1.8} />
+                  <Icon size={24} color={active ? COLORS.gold : COLORS.gray400} strokeWidth={1.8} />
                   <Text style={[es.catLabel, active && es.catLabelActive]}>
                     {cat.label}
                   </Text>
@@ -286,7 +285,7 @@ export default function SellerEditStore({ route, navigation }: any) {
         {/* ── ZONA PELIGROSA ── */}
         <View style={es.dangerCard}>
           <View style={es.dangerTitleRow}>
-            <AlertTriangle size={16} color={COLORS.primary} strokeWidth={2} />
+            <AlertTriangle size={16} color={COLORS.red} strokeWidth={2} />
             <Text style={es.dangerTitle}>Zona peligrosa</Text>
           </View>
           <TouchableOpacity
@@ -312,7 +311,7 @@ export default function SellerEditStore({ route, navigation }: any) {
                 ],
               );
             }}>
-            <Power size={15} color={COLORS.primary} strokeWidth={2} />
+            <Power size={15} color={COLORS.red} strokeWidth={2} />
             <Text style={es.dangerBtnTxt}>Desactivar todos mis productos</Text>
           </TouchableOpacity>
         </View>
@@ -325,7 +324,7 @@ export default function SellerEditStore({ route, navigation }: any) {
           activeOpacity={0.85}>
           {loading ? (
             <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-              <ActivityIndicator color={COLORS.white} size="small" />
+              <ActivityIndicator color={COLORS.black} size="small" />
               <Text style={es.saveBtnTxt}>Guardando...</Text>
             </View>
           ) : (
@@ -340,35 +339,35 @@ export default function SellerEditStore({ route, navigation }: any) {
 
 const es = StyleSheet.create({
   container:       { flex: 1, backgroundColor: COLORS.black },
-  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14, backgroundColor: COLORS.primary },
-  backBtn:         { width: 36, height: 36, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
+  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14 },
+  backBtn:         { width: 36, height: 36, backgroundColor: COLORS.blackSoft, borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
   headerTitle:     { fontSize: 17, fontWeight: FONT.black, color: COLORS.white },
-  card:            { backgroundColor: COLORS.white, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.md, ...SHADOW.card },
-  cardTitle:       { fontSize: 15, fontWeight: FONT.black, color: COLORS.gray800, marginBottom: SPACING.md },
+  card:            { backgroundColor: COLORS.blackSoft, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.md },
+  cardTitle:       { fontSize: 15, fontWeight: FONT.black, color: COLORS.white, marginBottom: SPACING.md },
   logoWrap:        { alignItems: 'center', marginBottom: SPACING.sm, position: 'relative' },
   logoImg:         { width: 120, height: 120, borderRadius: RADIUS.xl },
-  logoEditBadge:   { position: 'absolute', bottom: 0, right: '35%', backgroundColor: COLORS.primary, borderRadius: RADIUS.full, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
-  logoPlaceholder: { width: 120, height: 120, borderRadius: RADIUS.xl, backgroundColor: COLORS.primaryLight, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: COLORS.primary, borderStyle: 'dashed', gap: 6 },
-  logoHint:        { fontSize: 11, color: COLORS.primary, fontWeight: FONT.semibold, textAlign: 'center' },
+  logoEditBadge:   { position: 'absolute', bottom: 0, right: '35%', backgroundColor: COLORS.gold, borderRadius: RADIUS.full, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  logoPlaceholder: { width: 120, height: 120, borderRadius: RADIUS.xl, backgroundColor: COLORS.gold + '15', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: COLORS.gold, borderStyle: 'dashed', gap: 6 },
+  logoHint:        { fontSize: 11, color: COLORS.gold, fontWeight: FONT.semibold, textAlign: 'center' },
   changeLogoBtn:   { alignSelf: 'center', marginTop: 8 },
-  changeLogoBtnTxt:{ fontSize: 13, color: COLORS.primary, fontWeight: FONT.bold },
+  changeLogoBtnTxt:{ fontSize: 13, color: COLORS.gold, fontWeight: FONT.bold },
   field:           { marginBottom: SPACING.md },
-  label:           { fontSize: 13, fontWeight: FONT.bold, color: COLORS.gray600, marginBottom: 6 },
+  label:           { fontSize: 13, fontWeight: FONT.bold, color: COLORS.gray400, marginBottom: 6 },
   optional:        { fontWeight: FONT.regular, color: COLORS.gray400 },
-  inputWrap:       { borderWidth: 1.5, borderColor: COLORS.border, borderRadius: RADIUS.lg, paddingHorizontal: SPACING.md, paddingVertical: 12, backgroundColor: COLORS.gray50 },
+  inputWrap:       { borderWidth: 1.5, borderColor: COLORS.gray800, borderRadius: RADIUS.lg, paddingHorizontal: SPACING.md, paddingVertical: 12, backgroundColor: COLORS.black },
   inputError:      { borderColor: COLORS.red },
-  input:           { fontSize: 14, color: COLORS.gray800, padding: 0 },
+  input:           { fontSize: 14, color: COLORS.white, padding: 0 },
   errorTxt:        { fontSize: 12, color: COLORS.red, fontWeight: FONT.semibold, marginTop: 4 },
   catsGrid:        { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: SPACING.sm },
-  catBtn:          { width: '30%', alignItems: 'center', padding: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border, gap: 6 },
-  catBtnActive:    { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight },
-  catLabel:        { fontSize: 11, fontWeight: FONT.bold, color: COLORS.gray600, textAlign: 'center' },
-  catLabelActive:  { color: COLORS.primary },
-  dangerCard:      { backgroundColor: COLORS.white, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.md, ...SHADOW.card },
+  catBtn:          { width: '30%', alignItems: 'center', padding: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.gray800, gap: 6 },
+  catBtnActive:    { borderColor: COLORS.gold, backgroundColor: COLORS.gold + '15' },
+  catLabel:        { fontSize: 11, fontWeight: FONT.bold, color: COLORS.gray400, textAlign: 'center' },
+  catLabelActive:  { color: COLORS.gold },
+  dangerCard:      { backgroundColor: COLORS.blackSoft, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.md },
   dangerTitleRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: SPACING.md },
-  dangerTitle:     { fontSize: 14, fontWeight: FONT.black, color: COLORS.primary },
-  dangerBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: COLORS.redLight, borderRadius: RADIUS.lg, paddingVertical: 12 },
-  dangerBtnTxt:    { fontSize: 14, fontWeight: FONT.bold, color: COLORS.primary },
-  saveBtn:         { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: 15, alignItems: 'center', ...SHADOW.strong },
-  saveBtnTxt:      { color: COLORS.white, fontSize: 15, fontWeight: FONT.black },
+  dangerTitle:     { fontSize: 14, fontWeight: FONT.black, color: COLORS.red },
+  dangerBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: COLORS.red + '15', borderRadius: RADIUS.lg, paddingVertical: 12 },
+  dangerBtnTxt:    { fontSize: 14, fontWeight: FONT.bold, color: COLORS.red },
+  saveBtn:         { backgroundColor: COLORS.gold, borderRadius: RADIUS.lg, paddingVertical: 15, alignItems: 'center' },
+  saveBtnTxt:      { color: COLORS.black, fontSize: 15, fontWeight: FONT.black },
 });

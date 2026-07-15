@@ -1,352 +1,175 @@
 // src/screens/ProfileScreen.tsx
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, StatusBar } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import {
+  View, Text, TouchableOpacity, StyleSheet,
+  ScrollView, ActivityIndicator, StatusBar, Alert,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  Package, ShoppingBag, Undo2, Sparkles, Tag, Star,
-  MessageCircle, Heart, RefreshCw, User, Clock,
-  Store, MapPin, Settings, ChevronRight, Lock, Wallet,
+  Package, Heart, CreditCard, MapPin, Tag, Award,
+  Globe, MessageSquare, ChevronRight, LogOut, Users,
 } from 'lucide-react-native';
-import { COLORS, SPACING, RADIUS, FONT, SHADOW } from '../theme';
-import { ORDERS, PRODUCTS } from '../data';
-import { subscribePlus } from '../services';
-import { useAuth } from '../context';
-
-const MENU_GROUPS = [
-  {
-    label: 'Compras',
-    items: [
-      { icon: Package,    label: 'Mis pedidos',          sub: '',                              key: 'orders'  },
-      { icon: ShoppingBag,label: 'Productos comprados',  sub: '',                              key: 'bought'  },
-      { icon: Undo2,      label: 'Devoluciones',         sub: '',                              key: 'returns' },
-    ],
-  },
-  {
-    label: 'Beneficios',
-    items: [
-      { icon: Sparkles, label: 'Kaif Plus',          sub: 'Cashback y envío prioritario', key: 'plus'    },
-      { icon: Tag,      label: 'Mis cupones',        sub: 'KAIF10 disponible',            key: 'coupons' },
-      { icon: Star,     label: 'Categoría favorita', sub: 'Hasta −40%',                   key: 'fav_cat' },
-    ],
-  },
-  {
-    label: 'Mi Kaif Market',
-    items: [
-      { icon: MessageCircle, label: 'Reseñas y preguntas', sub: '', key: 'reviews' },
-      { icon: Heart,         label: 'Favoritos',           sub: '', key: 'favs'   },
-      { icon: RefreshCw,     label: 'Comparados',          sub: '', key: 'compare'},
-      { icon: User,          label: 'Mi perfil',           sub: '', key: 'profile'},
-      { icon: Clock,         label: 'Historial',           sub: '', key: 'history'},
-    ],
-  },
-  {
-    label: 'Otro',
-    items: [
-      { icon: MessageCircle, label: 'Chats',                 sub: 'Con soporte y vendedores', key: 'chats'   },
-      { icon: Store,         label: 'Vender en Kaif Market', sub: 'Administra tu tienda',     key: 'sell'    },
-      { icon: MapPin,        label: 'Puntos de recogida',    sub: '',                         key: 'pickup'  },
-      { icon: Settings,      label: 'Configuración',         sub: '',                         key: 'settings'},
-    ],
-  },
-];
+import { COLORS, SPACING, RADIUS, FONT } from '../theme';
+import { useAuth, useFavs } from '../context';
+import { supabase } from '../lib/supabase';
+import { useAppMode } from '../navigation/AppNavigator';
 
 export default function ProfileScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  const { user, isPlus, activatePlus, logout } = useAuth();
+  const { user, logout } = useAuth();
+  const { resetToRoleSelection } = useAppMode();
+  const { favCount } = useFavs();
 
-  const displayName   = user?.name   ?? 'Usuario Kaif';
-  const displayEmail  = user?.email  ?? 'Inicia sesión para ver tu perfil';
-  const displayAvatar = user?.avatar ?? 'KM';
+  const [loading, setLoading]       = useState(true);
+  const [activeOrders, setActiveOrders] = useState(0);
+  const [isPlus, setIsPlus]         = useState(false);
+  const [plusPts, setPlusPts]       = useState(0);
 
-  const cashbackTotal = 18000;
-  const cashbackMax   = 53000;
-  const cashbackPct   = Math.round((cashbackTotal / cashbackMax) * 100);
+  const load = useCallback(async () => {
+    if (!user?.id) { setLoading(false); return; }
+    try {
+      const { count } = await supabase
+        .from('orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('buyer_id', user.id)
+        .in('status', ['processing', 'shipped']);
+      setActiveOrders(count || 0);
 
-  const handleMenu = (key: string) => {
-    if (!user && ['orders','bought','returns','reviews','favs','history','profile','sell'].includes(key)) {
-      Alert.alert(
-        'Inicia sesión',
-        'Necesitas una cuenta para acceder a esta sección.',
-        [
-          { text: 'Cancelar' },
-          { text: 'Iniciar sesión', onPress: () => navigation.navigate('Login') },
-        ],
-      );
-      return;
+      setIsPlus(!!user.is_plus);
+      // TODO en BD: no existe todavía una columna de puntos Kaif Plus
+      // (`users.plus_points` o similar) — por ahora en 0 hasta que
+      // se defina cómo se acumulan.
+      setPlusPts(0);
+    } catch (e) {
+      if (__DEV__) { console.log('[PROFILE] load error:', e); }
+    } finally {
+      setLoading(false);
     }
-    switch (key) {
-      case 'orders':
-      case 'history':
-      case 'bought':
-        navigation.navigate('OrdersHistory');
-        break;
-      case 'sell':
-        if (user?.is_seller) {
-          navigation.navigate('SellerDashboard');
-        } else {
-          navigation.navigate('SellerRegister');
-        }
-        break;
-      case 'coupons':
-        Alert.alert('Mis cupones', '🏷️ KAIF10 — 10% OFF tu próxima compra\nVálido hasta el 31 de Mayo');
-        break;
-      case 'plus':
-        if (!isPlus) {
-          Alert.alert(
-            'Kaif Plus',
-            'Suscríbete por S/ 19.90/mes:\n\n• 2% cashback\n• Envío prioritario\n• Cuotas sin interés',
-            [
-              { text: 'Suscribirme', onPress: async () => { await subscribePlus(); activatePlus(); } },
-              { text: 'Cancelar' },
-            ],
-          );
-        } else {
-          Alert.alert('Kaif Plus activo ✦', 'Estás disfrutando todos los beneficios.');
-        }
-        break;
-      default:
-        Alert.alert('Próximamente', 'Esta función estará disponible pronto.');
-    }
-  };
+  }, [user?.id, user?.is_plus]);
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Cerrar sesión',
-      '¿Estás seguro que deseas salir?',
-      [
-        { text: 'Cancelar' },
-        { text: 'Salir', style: 'destructive', onPress: () => logout() },
-      ],
+  useEffect(() => { load(); }, [load]);
+
+  const stub = (title: string) => Alert.alert(title, 'Esta sección todavía está en desarrollo.');
+
+  if (loading) {
+    return (
+      <View style={[s.container, { alignItems: 'center', justifyContent: 'center' }]}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.black} />
+        <ActivityIndicator color={COLORS.primary} size="large" />
+      </View>
     );
-  };
+  }
 
-  const recentOrder  = ORDERS[0];
-  const firstProduct = recentOrder
-    ? PRODUCTS.find(p => p.id === recentOrder.items[0]?.productId)
-    : null;
+  const initials = (user?.name || 'U').charAt(0).toUpperCase();
+
+  const MENU = [
+    { icon: Package,       title: 'Mis Pedidos',   sub: `${activeOrders} activo${activeOrders === 1 ? '' : 's'}`, color: COLORS.red,    onPress: () => navigation.navigate('OrdersHistory') },
+    { icon: Heart,         title: 'Favoritos',     sub: `${favCount} guardado${favCount === 1 ? '' : 's'}`,        color: COLORS.gold,   onPress: () => navigation.getParent()?.navigate('FavoritesTab') },
+    { icon: CreditCard,    title: 'Métodos de pago', sub: 'Yape, Visa, PayPal',                                    color: COLORS.green,  onPress: () => navigation.navigate('PaymentMethods') },
+    { icon: MapPin,        title: 'Direcciones',   sub: 'Gestiona tus direcciones',                                 color: COLORS.blue,   onPress: () => stub('Direcciones') },
+    { icon: Tag,           title: 'Cupones',       sub: 'Tus cupones disponibles',                                  color: '#8B5CF6',     onPress: () => stub('Cupones') },
+    { icon: Award,         title: 'Kaif Plus',     sub: isPlus ? `Activo · ${plusPts} pts` : 'Únete y ahorra',      color: COLORS.gold,   onPress: () => navigation.navigate('KaifPlus') },
+    { icon: Globe,         title: 'Categorías',    sub: 'Explora por categoría',                                    color: COLORS.green,  onPress: () => navigation.getParent()?.navigate('SearchTab') },
+    { icon: MessageSquare, title: 'Libro de Reclamaciones', sub: 'Quejas y resoluciones',                           color: '#F97316',     onPress: () => navigation.navigate('Complaints') },
+  ];
 
   return (
-    <View style={[ps.container, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
-      <ScrollView showsVerticalScrollIndicator={false}>
+    <View style={[s.container, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.black} />
+      <ScrollView contentContainerStyle={{ padding: SPACING.lg, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
 
-        {/* ── HEADER ── */}
-        <View style={ps.header}>
-          <View style={ps.avatarWrap}>
-            <View style={ps.avatar}>
-              <Text style={ps.avatarTxt}>{displayAvatar}</Text>
-            </View>
+        <Text style={s.headerTitle}>Mi Perfil</Text>
+
+        {/* ── CARD PRINCIPAL ── */}
+        <TouchableOpacity style={s.profileCard} activeOpacity={0.85} onPress={() => stub('Perfil personal')}>
+          <View style={s.avatar}>
+            <Text style={s.avatarTxt}>{initials}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.name}>{user?.name || 'Usuario'}</Text>
+            <Text style={s.email}>{user?.email}</Text>
             {isPlus && (
-              <View style={ps.plusDot}>
-                <Text style={{ color: COLORS.primary, fontSize: 8, fontWeight: FONT.black }}>+</Text>
+              <View style={s.plusRow}>
+                <Award size={12} color={COLORS.gold} strokeWidth={2} />
+                <Text style={s.plusTxt}>Kaif Plus · {plusPts} pts</Text>
               </View>
             )}
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={ps.userName}>{displayName}</Text>
-            <Text style={ps.userSub}>{displayEmail}</Text>
-            {user?.is_seller && (
-              <View style={ps.sellerBadge}>
-                <Store size={11} color={COLORS.amber} strokeWidth={2} />
-                <Text style={ps.sellerBadgeTxt}>Vendedor</Text>
-              </View>
-            )}
-          </View>
-          <TouchableOpacity style={ps.chatBtn}>
-            <MessageCircle size={20} color={COLORS.white} strokeWidth={2} />
-          </TouchableOpacity>
-        </View>
-
-        {/* ── BOTÓN LOGIN / LOGOUT ── */}
-        {!user ? (
-          <TouchableOpacity
-            style={ps.loginBtn}
-            onPress={() => navigation.navigate('Login')}
-            activeOpacity={0.85}>
-            <Lock size={16} color={COLORS.white} strokeWidth={2} />
-            <Text style={ps.loginBtnTxt}>Iniciar sesión / Registrarse</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={ps.logoutRow}>
-            {user.is_seller && (
-              <TouchableOpacity
-                style={ps.sellerBtn}
-                onPress={() => navigation.navigate('SellerDashboard')}
-                activeOpacity={0.85}>
-                <Store size={15} color={COLORS.amber} strokeWidth={2} />
-                <Text style={ps.sellerBtnTxt}>Mi tienda</Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={ps.logoutBtn}
-              onPress={handleLogout}
-              activeOpacity={0.85}>
-              <Text style={ps.logoutBtnTxt}>Cerrar sesión</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* ── CASHBACK BANNER ── */}
-        <TouchableOpacity
-          style={ps.cashbackBanner}
-          activeOpacity={0.85}
-          onPress={() => handleMenu('plus')}>
-          <View style={{ flex: 1 }}>
-            <View style={ps.cashbackRow}>
-              <Text style={ps.cashbackAmount}>
-                S/ {(cashbackTotal / 100).toFixed(0)}
-              </Text>
-              <Text style={ps.cashbackOf}>
-                {' '}/ S/ {(cashbackMax / 100).toFixed(0)}
-              </Text>
-            </View>
-            <Text style={ps.cashbackLabel}>
-              {isPlus ? 'Cashback acumulado este mes' : 'Activa Kaif Plus para ganar cashback'}
-            </Text>
-            <View style={ps.progressBg}>
-              <View style={[ps.progressFill, { width: `${isPlus ? cashbackPct : 0}%` as any }]} />
-            </View>
-            <Text style={ps.cashbackSub}>
-              {isPlus ? '¡Sigue comprando para aumentarlo!' : 'Suscríbete por S/ 19.90/mes ›'}
-            </Text>
-          </View>
-          <View style={ps.cashbackIconWrap}>
-            <Wallet size={28} color={COLORS.primary} strokeWidth={1.8} />
-          </View>
+          <ChevronRight size={18} color={COLORS.gray400} />
         </TouchableOpacity>
 
-        {/* ── PEDIDO RECIENTE ── */}
-        {recentOrder && firstProduct && (
-          <View style={ps.recentCard}>
-            <View style={ps.recentHeader}>
-              <Text style={ps.recentTitle}>Pedido reciente</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('OrdersHistory')}>
-                <Text style={ps.recentLink}>Ver todos ›</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={ps.recentRow}>
-              <View style={ps.recentImg}>
-                <Package size={26} color={COLORS.gray400} strokeWidth={1.5} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={ps.recentName} numberOfLines={1}>
-                  {firstProduct.shortName}
-                </Text>
-                <Text style={ps.recentDate}>{recentOrder.date}</Text>
-                <View style={[ps.statusPill, { backgroundColor: recentOrder.statusBg }]}>
-                  <Text style={[ps.statusTxt, { color: recentOrder.statusColor }]}>
-                    {recentOrder.status}
-                  </Text>
+        {/* ── MENÚ ── */}
+        <View style={s.menuCard}>
+          {MENU.map((item, i) => {
+            const Icon = item.icon;
+            return (
+              <TouchableOpacity
+                key={item.title}
+                style={[s.menuRow, i === MENU.length - 1 && { borderBottomWidth: 0 }]}
+                onPress={item.onPress}
+                activeOpacity={0.7}>
+                <View style={[s.menuIconWrap, { backgroundColor: item.color + '22' }]}>
+                  <Icon size={17} color={item.color} strokeWidth={2} />
                 </View>
-              </View>
-              <Text style={ps.recentTotal}>S/ {recentOrder.total}</Text>
-            </View>
-          </View>
-        )}
-
-        {/* ── STATS ── */}
-        <View style={ps.statsWrap}>
-          {[
-            { label: 'Pedidos',   value: user ? String(ORDERS.length) : '0' },
-            { label: 'Reseñas',   value: '0' },
-            { label: 'Favoritos', value: '0' },
-            { label: 'Siguiendo', value: '0' },
-          ].map((stat, i) => (
-            <View
-              key={stat.label}
-              style={[ps.stat, i < 3 && { borderRightWidth: 0.5, borderRightColor: COLORS.border }]}>
-              <Text style={ps.statVal}>{stat.value}</Text>
-              <Text style={ps.statLbl}>{stat.label}</Text>
-            </View>
-          ))}
+                <View style={{ flex: 1 }}>
+                  <Text style={s.menuTitle}>{item.title}</Text>
+                  <Text style={s.menuSub}>{item.sub}</Text>
+                </View>
+                <ChevronRight size={16} color={COLORS.gray800} />
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {/* ── MENÚ AGRUPADO ── */}
-        {MENU_GROUPS.map(group => (
-          <View key={group.label} style={ps.group}>
-            <Text style={ps.groupLabel}>{group.label}</Text>
-            <View style={ps.groupCard}>
-              {group.items.map((item, idx) => {
-                const Icon = item.icon;
-                return (
-                  <TouchableOpacity
-                    key={item.key}
-                    style={[
-                      ps.menuItem,
-                      idx < group.items.length - 1 && ps.menuItemBorder,
-                    ]}
-                    onPress={() => handleMenu(item.key)}
-                    activeOpacity={0.7}>
-                    <View style={ps.menuIconWrap}>
-                      <Icon size={20} color={COLORS.gray600} strokeWidth={1.8} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={ps.menuLabel}>{item.label}</Text>
-                      {item.sub ? <Text style={ps.menuSub}>{item.sub}</Text> : null}
-                    </View>
-                    <ChevronRight size={18} color={COLORS.gray400} strokeWidth={2} />
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        ))}
+        <TouchableOpacity
+          style={s.changeRoleBtn}
+          onPress={() => Alert.alert(
+            'Cambiar de rol',
+            '¿Quieres volver a la pantalla donde eliges cómo usar KaifMarket?',
+            [
+              { text: 'Cancelar', style: 'cancel' },
+              { text: 'Sí, cambiar', onPress: resetToRoleSelection },
+            ],
+          )}
+          activeOpacity={0.85}>
+          <Users size={16} color={COLORS.primary} strokeWidth={2} />
+          <Text style={s.changeRoleBtnTxt}>Cambiar de rol</Text>
+        </TouchableOpacity>
 
-        <View style={{ height: 40 }} />
+        <TouchableOpacity
+          style={s.logoutBtn}
+          onPress={() => Alert.alert('Cerrar sesión', '¿Seguro que quieres salir?', [
+            { text: 'Cancelar', style: 'cancel' },
+            { text: 'Cerrar sesión', style: 'destructive', onPress: logout },
+          ])}
+          activeOpacity={0.8}>
+          <LogOut size={15} color={COLORS.gray400} strokeWidth={2} />
+          <Text style={s.logoutTxt}>Cerrar sesión</Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
 }
 
-const ps = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: COLORS.black },
-  header:          { flexDirection: 'row', alignItems: 'center', gap: 14, padding: SPACING.lg, backgroundColor: COLORS.primary },
-  avatarWrap:      { position: 'relative' },
-  avatar:          { width: 60, height: 60, borderRadius: 30, backgroundColor: COLORS.white, alignItems: 'center', justifyContent: 'center' },
-  avatarTxt:       { fontSize: 22, fontWeight: FONT.black, color: COLORS.primary },
-  plusDot:         { position: 'absolute', bottom: 0, right: 0, width: 18, height: 18, backgroundColor: COLORS.white, borderRadius: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: COLORS.primary },
-  userName:        { fontSize: 18, fontWeight: FONT.black, color: COLORS.white },
-  userSub:         { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
-  sellerBadge:     { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', backgroundColor: COLORS.white, borderRadius: RADIUS.full, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4 },
-  sellerBadgeTxt:  { fontSize: 11, color: COLORS.amber, fontWeight: FONT.bold },
-  chatBtn:         { width: 40, height: 40, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
-  loginBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, marginHorizontal: SPACING.lg, marginTop: SPACING.md, marginBottom: SPACING.md, paddingVertical: 14, ...SHADOW.strong },
-  loginBtnTxt:     { color: COLORS.white, fontSize: 15, fontWeight: FONT.black },
-  logoutRow:       { flexDirection: 'row', gap: 10, marginHorizontal: SPACING.lg, marginTop: SPACING.md, marginBottom: SPACING.md },
-  sellerBtn:       { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: COLORS.amberLight, borderRadius: RADIUS.lg, paddingVertical: 12 },
-  sellerBtnTxt:    { color: COLORS.amber, fontSize: 14, fontWeight: FONT.black },
-  logoutBtn:       { flex: 1, backgroundColor: COLORS.blackSoft, borderRadius: RADIUS.lg, paddingVertical: 12, alignItems: 'center' },
-  logoutBtnTxt:    { color: COLORS.gray200, fontSize: 14, fontWeight: FONT.bold },
-  cashbackBanner:  { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: COLORS.primaryLight, marginHorizontal: SPACING.lg, marginBottom: SPACING.sm, borderRadius: RADIUS.xl, padding: SPACING.lg },
-  cashbackRow:     { flexDirection: 'row', alignItems: 'baseline', marginBottom: 4 },
-  cashbackAmount:  { fontSize: 24, fontWeight: FONT.black, color: COLORS.primaryDark },
-  cashbackOf:      { fontSize: 14, color: COLORS.primary, fontWeight: FONT.semibold },
-  cashbackLabel:   { fontSize: 12, color: COLORS.primaryDark, fontWeight: FONT.bold, marginBottom: 8 },
-  progressBg:      { height: 6, backgroundColor: 'rgba(154,28,28,0.15)', borderRadius: 3, marginBottom: 6 },
-  progressFill:    { height: 6, backgroundColor: COLORS.primary, borderRadius: 3 },
-  cashbackSub:     { fontSize: 11, color: COLORS.primary, fontWeight: FONT.semibold },
-  cashbackIconWrap:{ width: 56, height: 56, borderRadius: RADIUS.full, backgroundColor: COLORS.white, alignItems: 'center', justifyContent: 'center' },
-  recentCard:      { backgroundColor: COLORS.white, marginHorizontal: SPACING.lg, marginBottom: SPACING.sm, borderRadius: RADIUS.xl, padding: SPACING.lg, ...SHADOW.card },
-  recentHeader:    { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  recentTitle:     { fontSize: 15, fontWeight: FONT.black, color: COLORS.gray800 },
-  recentLink:      { fontSize: 13, color: COLORS.primary, fontWeight: FONT.bold },
-  recentRow:       { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  recentImg:       { width: 52, height: 52, borderRadius: RADIUS.md, backgroundColor: COLORS.gray100, alignItems: 'center', justifyContent: 'center' },
-  recentName:      { fontSize: 14, fontWeight: FONT.bold, color: COLORS.gray800, marginBottom: 3 },
-  recentDate:      { fontSize: 12, color: COLORS.gray400, marginBottom: 6 },
-  statusPill:      { alignSelf: 'flex-start', borderRadius: RADIUS.full, paddingHorizontal: 8, paddingVertical: 3 },
-  statusTxt:       { fontSize: 11, fontWeight: FONT.bold },
-  recentTotal:     { fontSize: 16, fontWeight: FONT.black, color: COLORS.gray800 },
-  statsWrap:       { flexDirection: 'row', backgroundColor: COLORS.white, marginHorizontal: SPACING.lg, marginBottom: SPACING.md, borderRadius: RADIUS.lg, ...SHADOW.card },
-  stat:            { flex: 1, alignItems: 'center', paddingVertical: 16 },
-  statVal:         { fontSize: 20, fontWeight: FONT.black, color: COLORS.primary },
-  statLbl:         { fontSize: 11, color: COLORS.gray400, marginTop: 2 },
-  group:           { marginBottom: SPACING.sm },
-  groupLabel:      { fontSize: 12, fontWeight: FONT.bold, color: COLORS.gray400, paddingHorizontal: SPACING.lg, paddingVertical: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  groupCard:       { backgroundColor: COLORS.white, marginHorizontal: SPACING.lg, borderRadius: RADIUS.lg, overflow: 'hidden', ...SHADOW.card },
-  menuItem:        { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: SPACING.lg, paddingVertical: 14 },
-  menuItemBorder:  { borderBottomWidth: 0.5, borderBottomColor: COLORS.border },
-  menuIconWrap:    { width: 32, alignItems: 'center' },
-  menuLabel:       { fontSize: 15, color: COLORS.gray800, fontWeight: FONT.semibold },
-  menuSub:         { fontSize: 12, color: COLORS.gray400, marginTop: 1 },
+const s = StyleSheet.create({
+  container:    { flex: 1, backgroundColor: COLORS.black },
+  headerTitle:  { fontSize: 22, fontWeight: FONT.black, color: COLORS.white, marginBottom: SPACING.lg },
+
+  profileCard:  { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: COLORS.blackSoft, borderRadius: RADIUS.xl, padding: SPACING.lg, marginBottom: SPACING.lg },
+  avatar:       { width: 52, height: 52, borderRadius: RADIUS.lg, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
+  avatarTxt:    { fontSize: 20, fontWeight: FONT.black, color: COLORS.white },
+  name:         { fontSize: 16, fontWeight: FONT.black, color: COLORS.white },
+  email:        { fontSize: 12, color: COLORS.gray400, marginTop: 2 },
+  plusRow:      { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
+  plusTxt:      { fontSize: 11, color: COLORS.gold, fontWeight: FONT.bold },
+
+  menuCard:     { backgroundColor: COLORS.blackSoft, borderRadius: RADIUS.xl, overflow: 'hidden' },
+  menuRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: SPACING.md, borderBottomWidth: 0.5, borderBottomColor: 'rgba(255,255,255,0.06)' },
+  menuIconWrap: { width: 36, height: 36, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
+  menuTitle:    { fontSize: 14, fontWeight: FONT.bold, color: COLORS.white },
+  menuSub:      { fontSize: 11, color: COLORS.gray400, marginTop: 2 },
+  logoutBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16, marginTop: SPACING.lg },
+  logoutTxt:    { fontSize: 13, color: COLORS.gray400, fontWeight: FONT.semibold },
+  changeRoleBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1.5, borderColor: COLORS.primary, borderRadius: RADIUS.lg, paddingVertical: 14, marginTop: SPACING.lg },
+  changeRoleBtnTxt: { fontSize: 14, fontWeight: FONT.black, color: COLORS.primary },
 });

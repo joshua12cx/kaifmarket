@@ -3,14 +3,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert, Image,
-  RefreshControl, Switch, StatusBar,
+  RefreshControl, StatusBar, Switch,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  ChevronLeft, Plus, Package, Check, Star, Pencil, Trash2,
-} from 'lucide-react-native';
-import { COLORS, SPACING, RADIUS, FONT, SHADOW } from '../theme';
+import { Plus, Package, Check, Star, Pencil, Trash2 } from 'lucide-react-native';
+import { COLORS, SPACING, RADIUS, FONT } from '../theme';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context';
 
 interface Product {
   id:          string;
@@ -25,24 +24,36 @@ interface Product {
   category_id: string;
 }
 
-export default function SellerProductsScreen({ route, navigation }: any) {
-  const { sellerId } = route.params;
+// NOTA: esta pantalla ahora vive como tab dentro de SellerTabs, no
+// como pantalla de stack con parámetros — por eso ya no depende de
+// route.params.sellerId, lo resuelve solo a partir del usuario logueado.
+export default function SellerProductsScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
 
+  const [sellerId,   setSellerId]   = useState<string | null>(null);
   const [products,   setProducts]   = useState<Product[]>([]);
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter,     setFilter]     = useState<'all' | 'active' | 'inactive' | 'low_stock'>('all');
 
   const fetchProducts = useCallback(async () => {
+    if (!user?.id) { setLoading(false); return; }
     try {
+      // 1. Resolver el seller_id del usuario logueado
+      const { data: sellerRow } = await supabase
+        .from('sellers').select('id').eq('user_id', user.id).single();
+
+      if (!sellerRow) { setLoading(false); setRefreshing(false); return; }
+      setSellerId(sellerRow.id);
+
+      // 2. Sus productos
       const { data, error } = await supabase
         .from('products')
         .select('*')
-        .eq('seller_id', sellerId)
+        .eq('seller_id', sellerRow.id)
         .order('created_at', { ascending: false });
 
-      if (__DEV__) { console.log('[PRODUCTS] fetch:', { count: data?.length, error }); }
       if (data && !error) { setProducts(data as Product[]); }
     } catch (e) {
       if (__DEV__) { console.log('[PRODUCTS] Error:', e); }
@@ -50,7 +61,7 @@ export default function SellerProductsScreen({ route, navigation }: any) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [sellerId]);
+  }, [user?.id]);
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
@@ -67,7 +78,6 @@ export default function SellerProductsScreen({ route, navigation }: any) {
       .eq('id', product.id);
 
     if (error) {
-      // Revertir si hay error
       setProducts(prev => prev.map(p => p.id === product.id ? { ...p, is_active: !newActive } : p));
       Alert.alert('Error', 'No se pudo actualizar el producto');
     }
@@ -84,23 +94,15 @@ export default function SellerProductsScreen({ route, navigation }: any) {
           text: 'Eliminar',
           style: 'destructive',
           onPress: async () => {
-            const { error } = await supabase
-              .from('products')
-              .delete()
-              .eq('id', product.id);
-
-            if (!error) {
-              setProducts(prev => prev.filter(p => p.id !== product.id));
-            } else {
-              Alert.alert('Error', 'No se pudo eliminar el producto');
-            }
+            const { error } = await supabase.from('products').delete().eq('id', product.id);
+            if (!error) { setProducts(prev => prev.filter(p => p.id !== product.id)); }
+            else { Alert.alert('Error', 'No se pudo eliminar el producto'); }
           },
         },
       ],
     );
   };
 
-  // ── Filtrar productos ─────────────────────────────────────────
   const filtered = products.filter(p => {
     if (filter === 'active')    { return p.is_active && p.stock > 0; }
     if (filter === 'inactive')  { return !p.is_active; }
@@ -117,17 +119,17 @@ export default function SellerProductsScreen({ route, navigation }: any) {
 
   return (
     <View style={[sp.container, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.black} />
+
       <View style={sp.header}>
-        <TouchableOpacity style={sp.backBtn} onPress={() => navigation.goBack()}>
-          <ChevronLeft size={22} color={COLORS.white} strokeWidth={2.5} />
-        </TouchableOpacity>
-        <Text style={sp.headerTitle}>Mis productos</Text>
+        <Text style={sp.headerTitle}>Mis Productos</Text>
         <TouchableOpacity
           style={sp.addBtn}
-          onPress={() => navigation.navigate('SellerAddProduct', { sellerId })}>
-          <Plus size={14} color={COLORS.primary} strokeWidth={2.5} />
-          <Text style={sp.addBtnTxt}>Nuevo</Text>
+          onPress={() => navigation.navigate('SellerAddProduct', { sellerId })}
+          disabled={!sellerId}
+          activeOpacity={0.85}>
+          <Plus size={16} color={COLORS.black} strokeWidth={2.5} />
+          <Text style={sp.addBtnTxt}>Agregar</Text>
         </TouchableOpacity>
       </View>
 
@@ -140,9 +142,7 @@ export default function SellerProductsScreen({ route, navigation }: any) {
               style={[sp.filterBtn, filter === f.id && sp.filterBtnActive]}
               onPress={() => setFilter(f.id)}
               activeOpacity={0.8}>
-              <Text style={[sp.filterTxt, filter === f.id && sp.filterTxtActive]}>
-                {f.label}
-              </Text>
+              <Text style={[sp.filterTxt, filter === f.id && sp.filterTxtActive]}>{f.label}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -150,7 +150,7 @@ export default function SellerProductsScreen({ route, navigation }: any) {
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+          <ActivityIndicator size="large" color={COLORS.gold} />
         </View>
       ) : filtered.length === 0 ? (
         <View style={sp.empty}>
@@ -160,7 +160,7 @@ export default function SellerProductsScreen({ route, navigation }: any) {
           <Text style={sp.emptyTitle}>
             {products.length === 0 ? 'Aún no tienes productos' : 'Sin productos en este filtro'}
           </Text>
-          {products.length === 0 && (
+          {products.length === 0 && sellerId && (
             <TouchableOpacity
               style={sp.emptyBtn}
               onPress={() => navigation.navigate('SellerAddProduct', { sellerId })}>
@@ -173,16 +173,20 @@ export default function SellerProductsScreen({ route, navigation }: any) {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ padding: SPACING.lg, paddingBottom: 40 }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} tintColor={COLORS.primary} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.gold} />
           }>
           {filtered.map(product => (
-            <View key={product.id} style={sp.productCard}>
+            <TouchableOpacity
+              key={product.id}
+              style={sp.productCard}
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('SellerAddProduct', { sellerId, product })}>
               {/* Imagen */}
-              <View style={[sp.productImg, { backgroundColor: product.image_url ? COLORS.gray200 : COLORS.gray100 }]}>
+              <View style={sp.productImg}>
                 {product.image_url ? (
                   <Image source={{ uri: product.image_url }} style={sp.productImgReal} />
                 ) : (
-                  <Package size={28} color={COLORS.gray400} strokeWidth={1.5} />
+                  <Package size={26} color={COLORS.gray400} strokeWidth={1.5} />
                 )}
               </View>
 
@@ -191,25 +195,21 @@ export default function SellerProductsScreen({ route, navigation }: any) {
                 <Text style={sp.productName} numberOfLines={2}>{product.name}</Text>
                 <View style={sp.productPriceRow}>
                   <Text style={sp.productPrice}>S/ {product.price}</Text>
-                  {product.old_price && (
-                    <Text style={sp.productOldPrice}>S/ {product.old_price}</Text>
-                  )}
+                  {product.old_price ? <Text style={sp.productOldPrice}>S/ {product.old_price}</Text> : null}
                 </View>
                 <View style={sp.productStats}>
                   <View style={sp.statRow}>
-                    <Package size={11} color={product.stock <= 5 ? COLORS.primary : COLORS.gray600} strokeWidth={2} />
-                    <Text style={[sp.stockTxt, product.stock <= 5 && { color: COLORS.primary }]}>
-                      Stock: {product.stock}
+                    <Package size={11} color={product.stock <= 5 ? COLORS.red : COLORS.gray400} strokeWidth={2} />
+                    <Text style={[sp.stockTxt, product.stock <= 5 && { color: COLORS.red }]}>
+                      {product.stock} en stock
                     </Text>
-                  </View>
-                  <View style={sp.statRow}>
-                    <Check size={11} color={COLORS.gray600} strokeWidth={2} />
-                    <Text style={sp.soldTxt}>Vendidos: {product.sold}</Text>
                   </View>
                 </View>
                 <View style={sp.statRow}>
                   <Star size={11} color={COLORS.gold} fill={COLORS.gold} strokeWidth={0} />
                   <Text style={sp.ratingTxt}>{product.rating}</Text>
+                  <Check size={11} color={COLORS.gray400} strokeWidth={2} style={{ marginLeft: 8 }} />
+                  <Text style={sp.soldTxt}>{product.sold} vendidos</Text>
                 </View>
               </View>
 
@@ -218,22 +218,26 @@ export default function SellerProductsScreen({ route, navigation }: any) {
                 <Switch
                   value={product.is_active}
                   onValueChange={() => toggleActive(product)}
-                  trackColor={{ false: COLORS.gray200, true: COLORS.primary }}
+                  trackColor={{ false: COLORS.gray800, true: COLORS.gold }}
                   thumbColor={COLORS.white}
-                  style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                  ios_backgroundColor={COLORS.gray800}
+                  style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
                 />
-                <TouchableOpacity
-                  style={sp.editBtn}
-                  onPress={() => navigation.navigate('SellerAddProduct', { sellerId, product })}>
-                  <Pencil size={16} color={COLORS.gray600} strokeWidth={2} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={sp.deleteBtn}
-                  onPress={() => deleteProduct(product)}>
-                  <Trash2 size={16} color={COLORS.primary} strokeWidth={2} />
-                </TouchableOpacity>
+                <Text style={[sp.statusLabel, { color: product.is_active ? COLORS.gold : COLORS.gray400 }]}>
+                  {product.is_active ? 'ACTIVO' : 'PAUSADO'}
+                </Text>
+                <View style={sp.miniActions}>
+                  <TouchableOpacity
+                    style={sp.miniBtn}
+                    onPress={() => navigation.navigate('SellerAddProduct', { sellerId, product })}>
+                    <Pencil size={14} color={COLORS.gray400} strokeWidth={2} />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={sp.miniBtn} onPress={() => deleteProduct(product)}>
+                    <Trash2 size={14} color={COLORS.red} strokeWidth={2} />
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
+            </TouchableOpacity>
           ))}
         </ScrollView>
       )}
@@ -243,35 +247,35 @@ export default function SellerProductsScreen({ route, navigation }: any) {
 
 const sp = StyleSheet.create({
   container:       { flex: 1, backgroundColor: COLORS.black },
-  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: 14, backgroundColor: COLORS.primary },
-  backBtn:         { width: 36, height: 36, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: RADIUS.full, alignItems: 'center', justifyContent: 'center' },
-  headerTitle:     { fontSize: 17, fontWeight: FONT.black, color: COLORS.white },
-  addBtn:          { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.white, borderRadius: RADIUS.full, paddingHorizontal: 14, paddingVertical: 7 },
-  addBtnTxt:       { color: COLORS.primary, fontWeight: FONT.bold, fontSize: 13 },
-  filterWrap:      { backgroundColor: COLORS.black, paddingVertical: 10 },
-  filterBtn:       { backgroundColor: COLORS.white, borderRadius: RADIUS.full, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: 'transparent' },
-  filterBtnActive: { backgroundColor: COLORS.primaryLight, borderColor: COLORS.primary },
-  filterTxt:       { fontSize: 13, fontWeight: FONT.semibold, color: COLORS.gray600 },
-  filterTxtActive: { color: COLORS.primary, fontWeight: FONT.bold },
+  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, paddingBottom: SPACING.sm },
+  headerTitle:     { fontSize: 22, fontWeight: FONT.black, color: COLORS.white },
+  addBtn:          { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.gold, borderRadius: RADIUS.full, paddingHorizontal: 14, paddingVertical: 8 },
+  addBtnTxt:       { color: COLORS.black, fontWeight: FONT.black, fontSize: 13 },
+  filterWrap:      { paddingVertical: 10 },
+  filterBtn:       { backgroundColor: COLORS.blackSoft, borderRadius: RADIUS.full, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: COLORS.blackSoft },
+  filterBtnActive: { backgroundColor: COLORS.gold + '22', borderColor: COLORS.gold },
+  filterTxt:       { fontSize: 13, fontWeight: FONT.semibold, color: COLORS.gray400 },
+  filterTxtActive: { color: COLORS.gold, fontWeight: FONT.bold },
   empty:           { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
   emptyIconWrap:   { width: 80, height: 80, borderRadius: RADIUS.full, backgroundColor: COLORS.blackSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   emptyTitle:      { fontSize: 16, fontWeight: FONT.black, color: COLORS.white, textAlign: 'center', marginBottom: 16 },
-  emptyBtn:        { backgroundColor: COLORS.primary, borderRadius: RADIUS.lg, paddingHorizontal: 24, paddingVertical: 12 },
-  emptyBtnTxt:     { color: COLORS.white, fontWeight: FONT.black },
-  productCard:     { flexDirection: 'row', gap: 12, backgroundColor: COLORS.white, borderRadius: RADIUS.lg, padding: SPACING.md, marginBottom: SPACING.sm, alignItems: 'flex-start', ...SHADOW.card },
-  productImg:      { width: 72, height: 72, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' },
-  productImgReal:  { width: 72, height: 72 },
+  emptyBtn:        { backgroundColor: COLORS.gold, borderRadius: RADIUS.lg, paddingHorizontal: 24, paddingVertical: 12 },
+  emptyBtnTxt:     { color: COLORS.black, fontWeight: FONT.black },
+  productCard:     { flexDirection: 'row', gap: 12, backgroundColor: COLORS.blackSoft, borderRadius: RADIUS.xl, padding: SPACING.md, marginBottom: SPACING.sm, alignItems: 'flex-start' },
+  productImg:      { width: 64, height: 64, borderRadius: RADIUS.lg, alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden', backgroundColor: COLORS.gray800 },
+  productImgReal:  { width: 64, height: 64 },
   productInfo:     { flex: 1 },
-  productName:     { fontSize: 13, fontWeight: FONT.bold, color: COLORS.gray800, lineHeight: 18, marginBottom: 4 },
+  productName:     { fontSize: 13, fontWeight: FONT.bold, color: COLORS.white, lineHeight: 18, marginBottom: 4 },
   productPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 4 },
-  productPrice:    { fontSize: 15, fontWeight: FONT.black, color: COLORS.primary },
+  productPrice:    { fontSize: 15, fontWeight: FONT.black, color: COLORS.gold },
   productOldPrice: { fontSize: 11, color: COLORS.gray400, textDecorationLine: 'line-through' },
   productStats:    { flexDirection: 'row', gap: 12, marginBottom: 4 },
   statRow:         { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  stockTxt:        { fontSize: 11, color: COLORS.gray600, fontWeight: FONT.semibold },
-  soldTxt:         { fontSize: 11, color: COLORS.gray600, fontWeight: FONT.semibold },
-  ratingTxt:       { fontSize: 11, color: COLORS.gray600, fontWeight: FONT.bold },
-  productActions:  { alignItems: 'center', gap: 6 },
-  editBtn:         { padding: 6 },
-  deleteBtn:       { padding: 6 },
+  stockTxt:        { fontSize: 11, color: COLORS.gray400, fontWeight: FONT.semibold },
+  soldTxt:         { fontSize: 11, color: COLORS.gray400, fontWeight: FONT.semibold },
+  ratingTxt:       { fontSize: 11, color: COLORS.gray400, fontWeight: FONT.bold },
+  productActions:  { alignItems: 'center', gap: 4 },
+  statusLabel:     { fontSize: 10, fontWeight: FONT.black, letterSpacing: 0.3, marginBottom: 4 },
+  miniActions:     { flexDirection: 'row', gap: 4, marginTop: 4 },
+  miniBtn:         { padding: 4 },
 });
