@@ -4,7 +4,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Home, Search, ShoppingCart, Heart, User, LayoutDashboard, Package, ClipboardList, Store } from 'lucide-react-native';
+import { Home, Search, ShoppingCart, Heart, User, LayoutDashboard, Package, ClipboardList, Store, Truck, MapPin, DollarSign } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import SplashScreen      from '../screens/SplashScreen';
@@ -20,30 +20,36 @@ import SellerStoreScreen      from '../screens/SellerStoreScreen';
 import FavoritesScreen        from '../screens/FavoritesScreen';
 import LoginScreen            from '../screens/LoginScreen';
 import RegisterScreen         from '../screens/RegisterScreen';
-import RegisterSuccessScreen  from '../screens/RegisterSuccessScreen'; // NUEVO
-import RoleSelectionScreen, { EntryIntent } from '../screens/RoleSelectionScreen'; // NUEVO
+import RegisterSuccessScreen  from '../screens/RegisterSuccessScreen';
+import RoleSelectionScreen, { EntryIntent } from '../screens/RoleSelectionScreen';
 import CheckoutScreen         from '../screens/CheckoutScreen';
 import OrderSuccessScreen     from '../screens/OrderSuccessScreen';
 import OrdersHistoryScreen    from '../screens/OrdersHistoryScreen';
-import OrderTrackingScreen    from '../screens/OrderTrackingScreen'; // NUEVO
-import KaifPlusScreen         from '../screens/KaifPlusScreen'; // NUEVO
-import PaymentMethodsScreen   from '../screens/PaymentMethodsScreen'; // NUEVO
-import ComplaintsScreen       from '../screens/ComplaintsScreen'; // NUEVO
+import OrderTrackingScreen    from '../screens/OrderTrackingScreen';
+import KaifPlusScreen         from '../screens/KaifPlusScreen';
+import PaymentMethodsScreen   from '../screens/PaymentMethodsScreen';
+import ComplaintsScreen       from '../screens/ComplaintsScreen';
 import SellerDashboardScreen  from '../screens/SellerDashboardScreen';
 import SellerRegisterScreen   from '../screens/SellerRegisterScreen';
-import SellerApplicationSuccessScreen from '../screens/SellerApplicationSuccessScreen'; // NUEVO
-import SellerApplicationStatusScreen  from '../screens/SellerApplicationStatusScreen'; // NUEVO
-import MotorizadoRegisterScreen from '../screens/MotorizadoRegisterScreen'; // NUEVO
-import MotorizadoApplicationSuccessScreen from '../screens/MotorizadoApplicationSuccessScreen'; // NUEVO
-import MotorizadoApplicationStatusScreen  from '../screens/MotorizadoApplicationStatusScreen'; // NUEVO
+import SellerApplicationSuccessScreen from '../screens/SellerApplicationSuccessScreen';
+import SellerApplicationStatusScreen  from '../screens/SellerApplicationStatusScreen';
+import MotorizadoRegisterScreen from '../screens/MotorizadoRegisterScreen';
+import MotorizadoApplicationSuccessScreen from '../screens/MotorizadoApplicationSuccessScreen';
+import MotorizadoApplicationStatusScreen  from '../screens/MotorizadoApplicationStatusScreen';
+// ── Panel real de Transportista (NUEVO — Parte 1) ────────────────
+import MotorizadoDashboardScreen  from '../screens/MotorizadoDashboardScreen';
+import MotorizadoDeliveriesScreen from '../screens/MotorizadoDeliveriesScreen';
+import MotorizadoMapScreen        from '../screens/MotorizadoMapScreen';
+import MotorizadoEarningsScreen   from '../screens/MotorizadoEarningsScreen';
+import MotorizadoProfileScreen    from '../screens/MotorizadoProfileScreen';
 import SellerAddProductScreen from '../screens/SellerAddProductScreen';
 import SellerProductsScreen   from '../screens/SellerProductsScreen';
 import SellerReviewsScreen    from '../screens/SellerReviewsScreen';
 import SellerOrdersScreen     from '../screens/SellerOrdersScreen';
 import SellerEditStore        from '../screens/SellerEditStore';
-import SellerTiendaScreen     from '../screens/SellerTiendaScreen'; // NUEVO
-import SellerProfileScreen    from '../screens/SellerProfileScreen'; // NUEVO
-import SellerPlusScreen       from '../screens/SellerPlusScreen'; // NUEVO
+import SellerTiendaScreen     from '../screens/SellerTiendaScreen';
+import SellerProfileScreen    from '../screens/SellerProfileScreen';
+import SellerPlusScreen       from '../screens/SellerPlusScreen';
 
 import { COLORS, RADIUS, FONT } from '../theme';
 import { useCart, useNotifs, useFavs, useAuth } from '../context';
@@ -104,6 +110,16 @@ export type SellerTabParamList = {
   SellerProfileTab: undefined;
 };
 const SellerTab = createBottomTabNavigator<SellerTabParamList>();
+
+// ── Tabs del modo TRANSPORTISTA (barra verde, NUEVO — Parte 1) ────
+export type MotorizadoTabParamList = {
+  MotorizadoHomeTab:       undefined;
+  MotorizadoDeliveriesTab: undefined;
+  MotorizadoMapTab:        undefined;
+  MotorizadoEarningsTab:   undefined;
+  MotorizadoProfileTab:    undefined;
+};
+const MotorizadoTab = createBottomTabNavigator<MotorizadoTabParamList>();
 
 // Contexto chiquito para que cualquier pantalla dentro del modo
 // Vendedor (o Comprador) pueda pedir "volver a elegir rol" sin
@@ -331,6 +347,58 @@ function SellerTabs() {
   );
 }
 
+// ══════════════════════════════════════════════════════════════════
+//  MODO TRANSPORTISTA — barra de tabs verde (NUEVO — Parte 1)
+//  Mismo layout que las otras barras; solo cambia el color activo.
+// ══════════════════════════════════════════════════════════════════
+const MOTORIZADO_TABS = [
+  { name: 'MotorizadoHomeTab'       as const, Icon: Home,       label: 'Inicio'    },
+  { name: 'MotorizadoDeliveriesTab' as const, Icon: Truck,      label: 'Entregas'  },
+  { name: 'MotorizadoMapTab'        as const, Icon: MapPin,     label: 'Mapa'      },
+  { name: 'MotorizadoEarningsTab'   as const, Icon: DollarSign, label: 'Ganancias' },
+  { name: 'MotorizadoProfileTab'    as const, Icon: User,       label: 'Perfil'    },
+];
+
+function KaifMotorizadoTabBar({ state, navigation }: BottomTabBarProps) {
+  return (
+    <View style={motorizadoTb.bar}>
+      {state.routes.map((route, index) => {
+        const tab     = MOTORIZADO_TABS[index];
+        const focused = state.index === index;
+        const Icon    = tab.Icon;
+        return (
+          <TouchableOpacity
+            key={route.key}
+            style={tb.item}
+            onPress={() => navigation.navigate(route.name)}
+            activeOpacity={0.7}>
+            <View style={tb.iconWrap}>
+              <View style={[tb.iconBg, focused && motorizadoTb.iconBgActive]}>
+                <Icon size={20} color={focused ? COLORS.green : COLORS.gray400} strokeWidth={2} />
+              </View>
+            </View>
+            <Text style={[tb.label, focused && motorizadoTb.labelActive]}>{tab.label}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+function MotorizadoTabs() {
+  return (
+    <MotorizadoTab.Navigator
+      tabBar={props => <KaifMotorizadoTabBar {...props} />}
+      screenOptions={{ headerShown: false }}>
+      <MotorizadoTab.Screen name="MotorizadoHomeTab"       component={MotorizadoDashboardScreen} />
+      <MotorizadoTab.Screen name="MotorizadoDeliveriesTab" component={MotorizadoDeliveriesScreen} />
+      <MotorizadoTab.Screen name="MotorizadoMapTab"        component={MotorizadoMapScreen} />
+      <MotorizadoTab.Screen name="MotorizadoEarningsTab"   component={MotorizadoEarningsScreen} />
+      <MotorizadoTab.Screen name="MotorizadoProfileTab"    component={MotorizadoProfileScreen} />
+    </MotorizadoTab.Navigator>
+  );
+}
+
 function SellerRegisterStack({ initialRouteName = 'SellerRegister' }: { initialRouteName?: 'SellerRegister' | 'SellerApplicationStatus' }) {
   return (
     <Stack.Navigator initialRouteName={initialRouteName} screenOptions={{ headerShown: false }}>
@@ -446,15 +514,18 @@ export default function AppNavigator() {
   }
 
   // ── MODO TRANSPORTISTA ───────────────────────────────────────
-  // TODO: el panel real de reparto (aceptar pedidos, rutas, etc.)
-  // todavía no existe — solo están registro/éxito/estado por ahora.
+  // Parte 1: el caso 'panel' (transportista APROBADO, viene de
+  // RoleSelectionScreen) ahora sí abre el panel real con tabs
+  // verdes — antes caía incorrectamente en la pantalla de estado.
   if (entryIntent.mode === 'motorizado') {
     return (
       <AppModeContext.Provider value={{ resetToRoleSelection: () => setEntryIntent(null) }}>
         <NavigationContainer>
-          <MotorizadoRegisterStack
-            initialRouteName={entryIntent.motorizadoScreen === 'register' ? 'MotorizadoRegister' : 'MotorizadoApplicationStatus'}
-          />
+          {entryIntent.motorizadoScreen === 'panel'
+            ? <MotorizadoTabs />
+            : <MotorizadoRegisterStack
+                initialRouteName={entryIntent.motorizadoScreen === 'register' ? 'MotorizadoRegister' : 'MotorizadoApplicationStatus'}
+              />}
         </NavigationContainer>
       </AppModeContext.Provider>
     );
@@ -488,4 +559,11 @@ const sellerTb = StyleSheet.create({
   bar:          { flexDirection: 'row', backgroundColor: COLORS.black, borderTopWidth: 0.5, borderTopColor: COLORS.blackSoft, paddingBottom: 20, paddingTop: 6, paddingHorizontal: 4 },
   iconBgActive: { backgroundColor: COLORS.gold + '22' },
   labelActive:  { color: COLORS.gold, fontWeight: FONT.black },
+});
+
+// Barra del modo Transportista: mismo layout, acentos verdes.
+const motorizadoTb = StyleSheet.create({
+  bar:          { flexDirection: 'row', backgroundColor: COLORS.black, borderTopWidth: 0.5, borderTopColor: COLORS.blackSoft, paddingBottom: 20, paddingTop: 6, paddingHorizontal: 4 },
+  iconBgActive: { backgroundColor: COLORS.green + '22' },
+  labelActive:  { color: COLORS.green, fontWeight: FONT.black },
 });
